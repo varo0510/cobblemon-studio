@@ -26,6 +26,7 @@
 <!-- Tauri: builders (window.CSB) en el webview + puente /api->invoke -->
 <script src="/builders.js"></script>
 <script src="/tauri-shim.js"></script>
+<script src="/ctxmenu.js"></script>
 <style>
   /* CSS especifico de creator.html que studio.css NO cubre.
      Layout app/split, inputs, botones, tabs, mrow, statgrid, sumcard, etc.
@@ -239,7 +240,6 @@ tm:flamethrower</textarea></div>
       <div class="f mb-3"><label class="lab">Nombre del pack</label><input id="f-pack" placeholder="cobblemon_drakomon"></div>
       <button class="btn-ok wfull" id="genbtn" onclick="doBuild()" style="padding:12px;justify-content:center">Generar pack</button>
       <div id="okbox"></div>
-      <div id="err"></div>
     </div>
     </div></div>
   </section>
@@ -249,12 +249,13 @@ tm:flamethrower</textarea></div>
       <button class="small" onclick="toggleAnim()" id="animbtn" title="animación" aria-label="Reproducir/pausar animación">&#9658;</button>
       <button class="small" id="spinbtn" onclick="spin=!spin;$('spinbtn').classList.toggle('active',spin)" title="girar" aria-label="Girar modelo">Girar</button>
     </div>
-    <div id="hud" class="hud">arrastra · rueda = zoom</div>
+    <div id="hud" class="hud" role="status" aria-live="polite">arrastra · rueda = zoom</div>
   </section>
 </main>
 <footer class="topbar" style="position:static;height:auto;padding:var(--s3) var(--s4)">
   <button id="backbtn" onclick="go(-1)" disabled>Atrás</button>
   <span class="sp"></span>
+  <span id="err" role="alert" style="color:var(--err);font-size:12px;font-family:var(--font-mono);white-space:pre-wrap"></span>
   <span class="hint" id="stepinfo">Paso 1 de 4</span>
   <span class="sp"></span>
   <button class="primary" id="nextbtn" onclick="go(1)">Siguiente</button>
@@ -272,6 +273,8 @@ try{ if (localStorage.getItem('gd_side') === '1') $('appside').classList.add('co
 // proyecto abierto (lo fija el launcher de index.html): el Pokémon se añade DENTRO de él
 const PROJECT = (() => { try { return JSON.parse(localStorage.getItem('cs_current') || 'null'); } catch (e) { return null; } })();
 function splitPath(p){ const s=String(p).replace(/[\\/]+$/,''); const i=Math.max(s.lastIndexOf('\\'), s.lastIndexOf('/')); return { parent:s.slice(0,i), base:s.slice(i+1) }; }
+async function apiPost(url,body){ try{ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return await r.json(); }catch(e){ return {error:'No se pudo conectar: '+e.message}; } }
+function errMsg(m){ $('err').textContent=m?('✖ '+m):''; }
 const TYPES = ['normal','fire','water','grass','electric','ice','fighting','poison','ground','flying','psychic','bug','rock','ghost','dragon','dark','steel','fairy'];
 let step = 0, spin = true, animOn = true;
 const data = { model: null };          // model: {source, geoRel} | {source:'upload', geoText, textureB64, shinyB64, animText}
@@ -324,13 +327,13 @@ function renderModels(ms) {
 function filterModels() { const q = $('msearch').value.toLowerCase(); renderModels(allModels.filter(m => m.name.toLowerCase().includes(q))); }
 async function pickReuse(m) {
   data.model = { source: 'reuse', geoRel: m.geo };
-  const r = await fetch('/api/preview/model?geo=' + encodeURIComponent(m.geo)).then(r => r.json());
+  const r = await fetch('/api/preview/model?geo=' + encodeURIComponent(m.geo)).then(r => r.json()).catch(() => ({ error: 'no se pudo cargar el modelo' }));
   if (r.error) { $('hud').textContent = r.error; return; }
   cur = { geo: r.geo, texture: r.texture, animation: r.animation };
   if (!$('f-name').value) { $('f-name').value = cap(m.name); syncName(); }
   renderModel();
 }
-function upGeo(f) { if (!f) return; const r = new FileReader(); r.onload = () => { try { const g = JSON.parse(r.result); data.model = Object.assign({ source: 'upload' }, data.model && data.model.source === 'upload' ? data.model : {}, { source: 'upload', geoText: r.result }); cur.geo = g; renderModel(); upInfo(); } catch (e) { alert('geo.json inválido'); } }; r.readAsText(f); }
+function upGeo(f) { if (!f) return; const r = new FileReader(); r.onload = () => { try { const g = JSON.parse(r.result); data.model = Object.assign({ source: 'upload' }, data.model && data.model.source === 'upload' ? data.model : {}, { source: 'upload', geoText: r.result }); cur.geo = g; renderModel(); upInfo(); } catch (e) { errMsg('El .geo.json no es válido.'); } }; r.readAsText(f); }
 function upTex(f, which) { if (!f) return; const r = new FileReader(); r.onload = () => { ensureUp(); if (which === 'tex') { data.model.textureB64 = r.result; cur.texture = r.result; } else { data.model.shinyB64 = r.result; } renderModel(); upInfo(); }; r.readAsDataURL(f); }
 function upAnim(f) { if (!f) return; const r = new FileReader(); r.onload = () => { ensureUp(); data.model.animText = r.result; try { cur.animation = JSON.parse(r.result); } catch (e) {} renderModel(); upInfo(); }; r.readAsText(f); }
 function ensureUp() { if (!data.model || data.model.source !== 'upload') data.model = { source: 'upload' }; }
@@ -354,7 +357,8 @@ function setStep(n) {
   if (step === 3) buildSummary();
 }
 function go(d) {
-  if (d > 0) { const e = validate(); if (e) { alert(e); return; } }
+  if (d > 0) { const e = validate(); if (e) { errMsg(e); return; } }
+  errMsg('');
   setStep(step + d);
 }
 function validate() {
@@ -400,10 +404,10 @@ function buildSummary() {
     kv('Aparición', b.spawn ? (b.spawn.bucket + ' · nv ' + b.spawn.level + (b.spawn.biomes.length ? ' · ' + b.spawn.biomes.length + ' biomas' : '')) : 'no aparece (solo comando/huevo)');
 }
 async function doBuild() {
-  $('err').textContent = ''; $('okbox').style.display = 'none';
+  errMsg(''); $('okbox').style.display = 'none';
   const btn = $('genbtn'); btn.disabled = true; btn.textContent = 'Generando…';
   try {
-    const r = await fetch('/api/creator/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(collect()) }).then(r => r.json());
+    const r = await apiPost('/api/creator/build', collect());
     if (r.error) throw new Error(r.error);
     const zips = (r.zips || []).map(z => '<div class="kv"><span>' + z.kind + '</span><b>' + z.sizeKB + ' KB · ' + z.files + ' archivos</b></div>').join('');
     $('okbox').innerHTML = '<b style="color:var(--ok)">✓ ¡Pokémon creado!</b><div style="margin:8px 0">' + zips + '</div>' +
@@ -412,11 +416,13 @@ async function doBuild() {
       '<p class="hint" style="margin-top:10px">Mete el <b>_datapack.zip</b> en la carpeta <code>datapacks</code> del mundo y el <b>_resourcepack.zip</b> en <code>resourcepacks</code> (o ambos donde cargues packs de Cobblemon). Pruébalo en juego con <code>/pokespawn ' + r.species + '</code>.</p>';
     $('okbox').style.display = 'block';
     btn.textContent = '✓ Generado';
-  } catch (e) { $('err').textContent = '✖ ' + e.message; btn.textContent = 'Generar pack'; }
+  } catch (e) { errMsg(e.message); btn.textContent = 'Generar pack'; }
   finally { btn.disabled = false; }
 }
-function openFolder(p) { fetch('/api/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: p }) }); }
+function openFolder(p) { apiPost('/api/open', { path: p }); }
 
+// botones de subir archivo: tono verde cuando ya hay archivo (en vez de un tick aparte)
+document.addEventListener('change', e => { const inp = e.target; if (!inp || inp.type !== 'file') return; const b = inp.closest('label.btn,.btn'); if (b) b.classList.toggle('loaded', !!(inp.files && inp.files.length)); });
 // init
 fillTypes(); bst(); loadModels(); setStep(0); renderModel();
 (function initProject(){
@@ -430,5 +436,8 @@ fillTypes(); bst(); loadModels(); setStep(0); renderModel();
   }
 })();
 $('spinbtn').classList.toggle('active', spin);
+// menú contextual (clic derecho): el menú de campos de texto es automático; aquí un fallback de navegación
+if(window.ctxMenu){ const P=()=>{ try{ return window.parent&&window.parent!==window?window.parent:null; }catch(e){ return null; } };
+  ctxMenu.fallback(()=>{ const p=P(); return [ {icon:'🏠',label:'Inicio',action:()=>{ if(p&&p.navHome) p.navHome(); }}, {icon:'📖',label:'Guía',action:()=>{ if(p&&p.navGuide) p.navGuide(); }} ]; }); }
 </script>
 </body></html>

@@ -9,7 +9,7 @@ const D = 'data/cobblemon';
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
-const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').replace(/_+/g, '_');
 const list = (a) => (Array.isArray(a) ? a : String(a || '').split(',')).map((x) => String(x).trim()).filter(Boolean);
 const species = (a) => list(a).map((x) => x.toLowerCase().replace(/^cobblemon:/, ''));
 const numOr = (v, d) => { const n = parseFloat(v); return isNaN(n) ? d : n; };
@@ -32,8 +32,9 @@ function buildCondition(c) {
   if (has(c.maxSkyLight)) o.maxSkyLight = clampOr(c.maxSkyLight, 0, 15, 15);
   if (has(c.minLight)) o.minLight = clampOr(c.minLight, 0, 15, 0);
   if (has(c.maxLight)) o.maxLight = clampOr(c.maxLight, 0, 15, 15);
-  if (has(c.minY)) o.minY = intOr(c.minY);
-  if (has(c.maxY)) o.maxY = intOr(c.maxY);
+  if (has(c.minY)) o.minY = clampOr(c.minY, -64, 320, -64);
+  if (has(c.maxY)) o.maxY = clampOr(c.maxY, -64, 320, 320);
+  if (o.minY !== undefined && o.maxY !== undefined && o.minY > o.maxY) { const t = o.minY; o.minY = o.maxY; o.maxY = t; }
   if (c.canSeeSky === true || c.canSeeSky === false) o.canSeeSky = c.canSeeSky;
   if (has(c.fluid)) o.fluid = c.fluid;
   if (has(c.timeRange)) o.timeRange = c.timeRange;

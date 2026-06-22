@@ -21,8 +21,8 @@
 
   /* Texto */
   --text:#e7eaf0;          /* texto principal */
-  --dim:#929cab;           /* texto secundario (AA sobre panel; no bajar) */
-  --faint:#6b7483;         /* placeholders, hints muy terciarios */
+  --dim:#a8b0bf;           /* texto secundario (AA sobre panel; no bajar) */
+  --faint:#8894a3;         /* placeholders, hints muy terciarios */
 
   /* FIRMA DE MARCA: rojo-pokeball mate. SOLO accion/foco/activo. */
   --accent:#e4453d;        /* primario solido, item activo, anillo de foco */
@@ -113,6 +113,8 @@ small{color:var(--dim)}
   font-family:var(--font-mono);font-size:11.5px;color:var(--accent2);
   font-variant-numeric:tabular-nums;
 }
+/* datos tecnicos legibles: .mono y code en texto normal (accent2 rojo = avisos) */
+.mono,code{color:var(--text)}
 code{background:#0a0c10;padding:1px 6px;border-radius:5px}
 pre{margin:0}
 
@@ -275,6 +277,28 @@ button.primary:hover,.btn.primary:hover{background:var(--accent2);border-color:v
 /* "ok" reservado a confirmaciones de exito (build) — relleno verde mate */
 button.btn-ok,button.ok{background:var(--ok);border-color:var(--ok);color:#06140d;font-weight:700}
 button.btn-ok:hover,button.ok:hover{filter:brightness(1.06)}
+
+/* boton de subir archivo que YA tiene archivo: tono verde para marcar "hecho" (lo activa un listener delegado) */
+.btn.loaded{background:color-mix(in srgb,var(--ok) 20%,var(--panel2));border-color:color-mix(in srgb,var(--ok) 70%,var(--line));color:var(--text)}
+.btn.loaded:hover{background:color-mix(in srgb,var(--ok) 30%,var(--panel2));border-color:var(--ok)}
+.btn.loaded::after{content:" ✓";color:var(--ok);font-weight:700}
+
+/* ===== menú contextual propio (clic derecho) — ctxmenu.js ===== */
+.ctxmenu{position:fixed;z-index:9999;min-width:184px;max-width:300px;background:var(--panel);
+  border:1px solid var(--line2);border-radius:10px;padding:5px;font-size:13px;user-select:none;
+  box-shadow:0 14px 38px rgba(0,0,0,.5);animation:ctxin .09s ease}
+@keyframes ctxin{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+.ctxitem{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;cursor:pointer;color:var(--text)}
+.ctxitem:hover{background:var(--accent);color:var(--on-accent)}
+.ctxitem .cxi{width:18px;flex:0 0 auto;text-align:center;font-size:14px}
+.ctxitem .cxl{flex:1;white-space:nowrap}
+.ctxitem .cxk{color:var(--faint);font-size:11px;margin-left:14px}
+.ctxitem:hover .cxk{color:var(--on-accent)}
+.ctxitem.danger{color:var(--err)}
+.ctxitem.danger:hover{background:var(--err);color:#fff}
+.ctxitem.off{opacity:.45;cursor:default}
+.ctxitem.off:hover{background:none;color:var(--text)}
+.ctxsep{height:1px;background:var(--line);margin:5px 6px}
 
 /* peligro = GHOST (texto/borde danger que se rellena al hover) */
 button.del,.btn.danger{color:var(--err);border-color:transparent;background:transparent}

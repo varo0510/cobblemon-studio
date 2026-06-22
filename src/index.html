@@ -8,6 +8,7 @@
 <!-- Tauri: builders (window.CSB) en el webview + puente /api->invoke -->
 <script src="/builders.js"></script>
 <script src="/tauri-shim.js"></script>
+<script src="/ctxmenu.js"></script>
 <!-- motor 3D para el inspector del pack (modelos/animaciones) -->
 <script src="/vendor/three.min.js"></script>
 <script src="/vendor/OrbitControls.js"></script>
@@ -194,6 +195,11 @@
   .snav-group[data-cat=objetos] {--cat:#e3a93a}
   .snav-group[data-cat=recursos]{--cat:#b07ff0}
   .snav-group[data-cat=mipack]  {--cat:#4ea7dd}
+  .snav-group[data-cat=editor]  {--cat:#d36bd3}
+  /* divisor para redimensionar la barra lateral (oculto si la barra está plegada) */
+  .side-resize{flex:0 0 5px;cursor:col-resize;background:transparent;transition:background .12s}
+  .side-resize:hover{background:var(--accent)}
+  #appside.collapsed + .side-resize{display:none}
   .snav-group{margin-top:7px}
   /* cabecera de categoría */
   .snav-cat{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;user-select:none;
@@ -235,12 +241,6 @@
     background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;
     box-shadow:0 10px 34px rgba(0,0,0,.55);font-size:12.5px;color:var(--text);max-width:340px}
   .upd-banner.hide{display:none}
-  /* modeswitch: segmented control de botones (la nav de studio.css estiliza <a>) */
-  .modeswitch.nav button{border:none;border-right:1px solid var(--line);border-radius:0;background:transparent;
-    color:var(--dim);padding:6px 12px;font-size:12px;font-weight:600}
-  .modeswitch.nav button:last-child{border-right:0}
-  .modeswitch.nav button:hover{color:var(--text);transform:none;background:color-mix(in srgb,var(--accent) 8%,transparent)}
-  .modeswitch.nav button.active{background:var(--accent);color:var(--on-accent);font-weight:700}
   /* pantalla de inicio por objetivos (extras no cubiertos por studio.css) */
   .goalpanel{padding:22px 22px 18px}
   .goalcard:hover .gi{transform:scale(1.06)}
@@ -255,10 +255,6 @@
   .catlegend [data-cat=asistente]{--c:var(--cat-asistente)}.catlegend [data-cat=pokemon]{--c:var(--cat-pokemon)}
   .catlegend [data-cat=spawning]{--c:var(--cat-spawning)}.catlegend [data-cat=pokedex]{--c:var(--cat-pokedex)}
   .catlegend [data-cat=objetos]{--c:var(--cat-objetos)}.catlegend [data-cat=mundo]{--c:var(--cat-mundo)}.catlegend [data-cat=resource]{--c:var(--cat-resource)}
-  /* MODO FÁCIL: esconde toda la jerga; solo se ve lo creado desde la pantalla de inicio */
-  body.easy #sections,body.easy #search,body.easy #tabsbar,body.easy .group,body.easy .catlegend,body.easy [data-adv]{display:none!important}
-  body.easy #panelContent>h2{display:none}
-  [data-easyonly]{display:none}body.easy [data-easyonly]{display:revert}
   .expsummary{background:color-mix(in srgb,var(--accent) 8%,transparent);border:1px solid color-mix(in srgb,var(--accent) 28%,var(--line));border-radius:10px;padding:12px 14px;margin:10px 0 14px;font-size:14px}
   .expsummary b{color:var(--accent2)}
   .expgroup>h3{font-size:14px;color:var(--accent2);margin:16px 0 8px;border-bottom:1px solid var(--line);padding-bottom:6px}
@@ -402,10 +398,6 @@
     <span class="pill" id="pf">pack_format ?</span>
     <span class="status-badge off" id="destBadge"><span class="dot"></span><span>sin carpeta</span></span>
     <button id="btnHome" class="small hide" onclick="goHome()" aria-label="Inicio">Inicio</button>
-    <div class="modeswitch nav" role="tablist" aria-label="Modo">
-      <button id="mEasy" class="active" role="tab" aria-selected="true" onclick="setMode('easy')">Fácil</button>
-      <button id="mExpert" role="tab" aria-selected="false" onclick="setMode('expert')">Experto</button>
-    </div>
   </div>
 </header>
 <div class="apptabs" id="appTabbar"></div>
@@ -432,6 +424,18 @@
       <a class="snav-item" data-nav="variante" onclick="assistant('variante')">Forma regional</a>
       <a class="snav-item" data-nav="complemento" onclick="assistant('complemento')">Cosmético</a>
       <a class="snav-item" data-nav="evolucion" onclick="assistant('evolucion')">Evolución</a>
+    </div>
+  </div>
+
+  <div class="snav-group" data-cat="editor">
+    <div class="snav-cat" onclick="toggleNavCat(this)">
+      <svg class="cic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 2.4a5.6 5.6 0 1 0 0 11.2c.9 0 1.4-.6 1.4-1.4 0-.8-.7-1-.7-1.6 0-.5.4-.9 1-.9h1.2A3 3 0 0 0 13.6 7 5.6 5.6 0 0 0 8 2.4z"/><circle cx="5.5" cy="6.2" r=".9" fill="currentColor" stroke="none"/><circle cx="8" cy="5" r=".9" fill="currentColor" stroke="none"/><circle cx="10.5" cy="6.2" r=".9" fill="currentColor" stroke="none"/></svg>
+      <span>Editor</span>
+      <svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 4.5 6 8l3-3.5"/></svg>
+    </div>
+    <div class="snav-items">
+      <a class="snav-item" data-nav="paint" onclick="navPaint()">🖌️ Editor de modelos</a>
+      <a class="snav-item" data-nav="paintpng" onclick="navPaintPng()">🖼️ Editor PNG</a>
     </div>
   </div>
 
@@ -494,6 +498,7 @@
     <svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 2.5h6.5a2 2 0 0 1 2 2V14H5a2 2 0 0 0-2 1.5V2.5Z"/></svg> Guía y ayuda
   </a>
 </aside>
+<div class="side-resize" id="sideResize" title="Arrastra para redimensionar el menú"></div>
 <div class="appmain">
 <div class="wrap">
 
@@ -571,7 +576,7 @@
     <details class="gsec"><summary>🧭 El flujo completo, paso a paso</summary><div class="gbody">
       <ol>
         <li><b>Carpeta de trabajo</b> (Sección 1): una carpeta donde conviven <code>data/</code> y <code>assets/</code>. Puedes crear una nueva o reutilizar una existente (se le suma, no se borra nada).</li>
-        <li><b>Añade bloques</b> (Sección 2): cada bloque es una cosa (un Pokémon, un spawn, una baya…). Usa los <b>asistentes</b> para hacer varias cosas de golpe, o las piezas sueltas en Modo Experto.</li>
+        <li><b>Añade bloques</b> (Sección 2): cada bloque es una cosa (un Pokémon, un spawn, una baya…). Usa los <b>asistentes</b> para hacer varias cosas de golpe, o añade piezas sueltas desde 📦 Datapack / 🎨 Resource pack.</li>
         <li><b>Comprueba</b> con <b>{ } ver JSON</b> (previsualiza un bloque) o el botón <b>? ayuda</b> de cada bloque.</li>
         <li><b>Generar</b>: escribe los archivos. Marca <b>“Sobrescribir”</b> si quieres reemplazar los que ya existan.</li>
         <li><b>Empaquetar .zip</b>: crea los dos zips listos para instalar.</li>
@@ -579,13 +584,6 @@
       </ol>
     </div></details>
 
-    <details class="gsec"><summary>🙂🛠️ Modo Fácil vs Modo Experto</summary><div class="gbody">
-      <ul>
-        <li><b>🙂 Fácil:</b> solo los asistentes y lo esencial. Ideal para empezar. Esconde la jerga.</li>
-        <li><b>🛠️ Experto:</b> añade todas las piezas técnicas sueltas (resolver, poser, tags, recetas, features…) y campos avanzados. Para cuando ya sabes lo que buscas.</li>
-      </ul>
-      <p>Cambias de modo con los botones de arriba a la derecha. Tu elección se recuerda.</p>
-    </div></details>
 
     <details class="gsec"><summary>✨ Los asistentes (hacen todo de una vez)</summary><div class="gbody">
       <ul>
@@ -743,7 +741,6 @@
         <div style="flex:2" data-adv><label>Descripción</label><input type="text" id="newDesc" value="Pack Cobblemon"></div>
         <div data-adv><label>format datapack <i class="tip" data-tip="pack_format del DATAPACK. 48 = MC 1.21.1.">i</i></label><input type="number" id="newPF" value="48"></div>
         <div data-adv><label>format resource <i class="tip" data-tip="pack_format del RESOURCE PACK. 34 = MC 1.21.1. Se aplica al empaquetar el _resourcepack.zip.">i</i></label><input type="number" id="newRPF" value="34"></div></div>
-      <div class="hint" data-easyonly style="margin-top:8px">Los detalles técnicos (descripción, formato…) se rellenan solos. Si necesitas cambiarlos, usa el <b>Modo Experto</b> arriba.</div>
     </div>
     <div id="boxEx" class="hide">
       <label>Carpeta del pack existente (con pack.mcmeta)</label>
@@ -1252,16 +1249,7 @@ function doSearch(q){
   });
 }
 
-// --- modo Fácil/Experto + pantalla de inicio por objetivos ---
-function setMode(m){
-  exitAssist();
-  const easy=m!=='expert';
-  document.body.classList.toggle('easy',easy); document.body.classList.toggle('expert',!easy);
-  $('mEasy').classList.toggle('active',easy); $('mExpert').classList.toggle('active',!easy);
-  try{localStorage.setItem('gd_mode',easy?'easy':'expert');}catch(e){}
-  if(!easy){ $('goalScreen').classList.add('hide'); $('explorerScreen').classList.add('hide'); $('guideScreen').classList.add('hide'); $('panelDest').classList.remove('hide'); $('panelContent').classList.remove('hide'); $('packStatePanel').classList.remove('hide'); $('btnHome').classList.add('hide'); showSection(curSection||'asistente'); refreshPackInfo(); }
-  else goHome();
-}
+// --- pantalla de inicio por objetivos ---
 function goHome(){ setFrameMode(false); amPackFull(false); exitAssist(); $('packHome')&&$('packHome').classList.add('hide'); $('goalScreen').classList.remove('hide'); $('panelDest').classList.add('hide'); $('panelContent').classList.add('hide'); $('packStatePanel').classList.add('hide'); $('explorerScreen').classList.add('hide'); $('guideScreen').classList.add('hide'); $('btnHome').classList.add('hide'); window.scrollTo({top:0,behavior:'smooth'}); }
 function revealEditor(){ setFrameMode(false); amPackFull(false); $('packHome')&&$('packHome').classList.add('hide'); $('goalScreen').classList.add('hide'); $('explorerScreen').classList.add('hide'); $('guideScreen').classList.add('hide'); $('panelDest').classList.remove('hide'); $('panelContent').classList.remove('hide'); $('packStatePanel').classList.remove('hide'); $('btnHome').classList.remove('hide'); refreshPackInfo(); }
 function openGuide(){ setFrameMode(false); amPackFull(false); exitAssist(); $('packHome')&&$('packHome').classList.add('hide'); $('goalScreen').classList.add('hide'); $('panelDest').classList.add('hide'); $('panelContent').classList.add('hide'); $('packStatePanel').classList.add('hide'); $('explorerScreen').classList.add('hide'); $('guideScreen').classList.remove('hide'); $('btnHome').classList.remove('hide'); window.scrollTo({top:0,behavior:'smooth'}); }
@@ -1452,7 +1440,7 @@ async function reopenInForm(){
   const rel=curFileRel, kind=kindFromRel(rel); if(!kind||!REOPEN[kind]) return;
   let obj; try{ obj=JSON.parse(curFileText); }catch(e){ alert('No se puede reabrir: el JSON no es válido.'); return; }
   closeFileView(); revealEditor();
-  if(document.body.classList.contains('expert')){ const cat=CAT[kind]; if(cat){ showSection(CAT2SECTION[cat]); showTab(cat); } }
+  { const cat=CAT[kind]; if(cat){ showSection(CAT2SECTION[cat]); showTab(cat); } }
   addCard(kind); const c=$('cards').lastElementChild;
   try{ REOPEN[kind](obj,c,rel); }catch(e){ console.error('reopen',e); }
   c.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -1475,8 +1463,8 @@ async function refreshPackInfo(){
   box.innerHTML=html;
 }
 const GOAL={nuevo:'wiznewpokemon',aspecto:'wizreskin',variante:'wizregional',complemento:'wizcosmetic',aparezca:'wizspawndex',evolucion:'wizevolution',montar:'mount',textos:'lang'};
-function goTo(id){ if(id==='objeto'){ $('objMenu').classList.remove('hide'); return; } const kind=GOAL[id]; if(!kind) return; revealEditor(); if(document.body.classList.contains('expert')){ const cat=CAT[kind]; showSection(CAT2SECTION[cat]); showTab(cat); } addCard(kind); }
-function goObj(kind){ $('objMenu').classList.add('hide'); revealEditor(); if(document.body.classList.contains('expert')){ showSection('datapack'); showTab('objetos'); } addCard(kind); }
+function goTo(id){ if(id==='objeto'){ $('objMenu').classList.remove('hide'); return; } const kind=GOAL[id]; if(!kind) return; revealEditor(); { const cat=CAT[kind]; showSection(CAT2SECTION[cat]); showTab(cat); } addCard(kind); }
+function goObj(kind){ $('objMenu').classList.add('hide'); revealEditor(); showSection('datapack'); showTab('objetos'); addCard(kind); }
 const EXAMPLES={
  wiznewpokemon:{'.w-sp':'flamewolf','.w-dex':'5001','.w-name':'Flamewolf','.w-desc':'Un lobo de fuego que caza en manadas al anochecer.','.w-t1':'fire','.w-catch':'45','.w-hp':'65','.w-atk':'80','.w-def':'55','.w-spa':'70','.w-spd':'55','.w-spe':'90','.w-abil':'blaze, h:flashfire','.w-moves':'1:tackle, 1:ember, 10:bite, 20:flamewheel','.w-egg':'field'},
  wizregional:{'.g-target':'cobblemon:vulpix','.g-aspect':'glaciar','.g-folder':'0037_vulpix','.g-formname':'glaciar','.g-t1':'ice','.g-abil':'snowcloak'},
@@ -2187,22 +2175,30 @@ init();
 // --- NAVEGACIÓN POR SIDEBAR (cablea el árbol a las funciones que ya existen) ---
 // ===== PESTAÑAS GLOBALES (toda la app por pestañas, estado conservado) =====
 let appTabs=[], appActive=null;
-function snapshotActiveTab(){ const t=appTabs.find(x=>x.id===appActive); if(t&&t.kind==='assistant'){ try{ t.state=serializeCards(); }catch(e){} } }
+function snapshotActiveTab(){ const t=appTabs.find(x=>x.id===appActive); if(t&&t.kind==='assistant'){ try{ t.state=serializeCards(); }catch(e){} } else if(t&&t.id==='pack'){ try{ t.state={pkTabs, pkActiveRel}; }catch(e){} } }
 function openAppTab(id,title,icon,opener,kind){
   snapshotActiveTab();   // conserva lo escrito del asistente actual antes de re-renderizar
   let tab=appTabs.find(t=>t.id===id);
   if(!tab){ tab={id,title,icon,opener,kind:kind||'view',state:null}; appTabs.push(tab); }
   else { tab.opener=opener; }
   appActive=id; renderAppTabs();
+  if(tab.id==='pack'&&tab.state){ try{ pkTabs=tab.state.pkTabs||[]; pkActiveRel=tab.state.pkActiveRel||null; }catch(e){} }   // restaura pestañas del pack antes de renderizar
   tab.opener();
   if(tab.kind==='assistant'&&tab.state){ try{ restoreCards(tab.state); }catch(e){} }
 }
 function activateAppTab(id){ const t=appTabs.find(x=>x.id===id); if(t) openAppTab(t.id,t.title,t.icon,t.opener,t.kind); }
+function tabIsDirty(id){
+  if(id.indexOf('frame:')===0){ const fr=document.querySelector('#frameScreen iframe[data-frame="'+id.slice(6)+'"]'); try{ return !!(fr&&fr.contentWindow&&fr.contentWindow.csFrameDirty&&fr.contentWindow.csFrameDirty()); }catch(e){ return false; } }
+  if(id==='pack'){ try{ return Object.keys(pkDrafts||{}).length>0; }catch(e){ return false; } }
+  return false;
+}
 function closeAppTab(id,ev){ if(ev)ev.stopPropagation(); const i=appTabs.findIndex(t=>t.id===id); if(i<0)return;
+  if(tabIsDirty(id) && !confirm('Esta pestaña tiene cambios sin guardar.\n¿Cerrarla y perder los cambios?')) return;   // anti-pérdida
   if(id.indexOf('frame:')===0){ const fr=document.querySelector('#frameScreen iframe[data-frame="'+id.slice(6)+'"]'); if(fr) fr.remove(); }   // libera el iframe
   const wasActive=(appActive===id); appTabs.splice(i,1);
   if(wasActive){ appActive=null; const nxt=appTabs[Math.min(i,appTabs.length-1)]; if(nxt) activateAppTab(nxt.id); else navHome(); }
   else renderAppTabs();
+  csNoteDirty();
 }
 function renderAppTabs(){ const bar=$('appTabbar'); if(!bar)return;
   bar.innerHTML=appTabs.map(t=>{ const a=t.id===appActive?' active':''; const cl=t.id!=='inicio';
@@ -2255,6 +2251,8 @@ function syncTabsFromDOM(){ const bar=$('appTabbar'); if(!bar) return;
 const FRAME_PAGES={
   creator:{ url:'/creator.html?embed=1', title:'Pokémon nuevo', icon:'🆕', nav:'crearPok' },
   reskin: { url:'/reskin.html?embed=1',  title:'Reskin / aspecto', icon:'🎨', nav:'reskin' },
+  paint:  { url:'/paint.html?embed=1',   title:'Editor de modelos', icon:'🖌️', nav:'paint' },
+  paintpng:{ url:'/paint.html?embed=1&mode=png', title:'Editor PNG', icon:'🖼️', nav:'paintpng' },
 };
 function setFrameMode(on){   // alterna entre el contenido normal (.wrap+.foot) y el host de iframes
   const w=document.querySelector('.appmain>.wrap'), foot=document.querySelector('.appmain>.foot'), fh=$('frameScreen');
@@ -2278,6 +2276,8 @@ function openFrameTab(key){ if(!lastRoot){ showLauncher(); return; } const p=FRA
   openAppTab('frame:'+key, p.title, p.icon, ()=>{ showFrame(key); setActiveNav(p.nav); }); }
 function navCreator(){ openFrameTab('creator'); }
 function navReskin(){ openFrameTab('reskin'); }
+function navPaint(){ openFrameTab('paint'); }
+function navPaintPng(){ openFrameTab('paintpng'); }
 
 function setActiveNav(key){ document.querySelectorAll('#appside .snav-item').forEach(a=>{ const on=key!=null && a.dataset.nav===key; a.classList.toggle('on', on); if(on){ const g=a.closest('.snav-group'); if(g) g.classList.remove('collapsed'); } }); }
 // categorías plegables del menú lateral (estado persistente en localStorage)
@@ -2290,7 +2290,7 @@ function restoreNavCats(){ navCollapsed().forEach(cat=>{ const g=document.queryS
 function navHome(){ openAppTab('inicio','Inicio','🏠',()=>{ goHome(); setActiveNav('inicio'); }); }
 function navGoal(id){ goTo(id); setActiveNav(id); }
 function navObj(kind){ goObj(kind); setActiveNav(kind); }
-function navKind(kind){ revealEditor(); if(document.body.classList.contains('expert')){ const cat=CAT[kind]; if(cat){ showSection(CAT2SECTION[cat]||'datapack'); showTab(cat);} } addCard(kind); setActiveNav(kind); }
+function navKind(kind){ revealEditor(); { const cat=CAT[kind]; if(cat){ showSection(CAT2SECTION[cat]||'datapack'); showTab(cat);} } addCard(kind); setActiveNav(kind); }
 function navState(){ revealEditor(); setActiveNav('estado'); const el=$('packStatePanel'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 function navExplore(){ openExplorer(); setActiveNav('explorar'); }
 function navPack(){ if(!lastRoot){ showLauncher(); return; } openAppTab('pack','Contenido del pack','📦',()=>{ exitAssist(); renderPackHome(); setActiveNav('estado'); }); }   // contenido del pack — logo lo abre
@@ -2331,17 +2331,18 @@ function buildPkTree(d){
 function pkFilter(q){ q=(q||'').toLowerCase().trim(); document.querySelectorAll('#pkTree .pk-cat').forEach(cat=>{ let any=false; cat.querySelectorAll('.pk-item').forEach(it=>{ const m=!q||it.textContent.toLowerCase().includes(q); it.style.display=m?'':'none'; if(m)any=true; }); cat.style.display=any?'':'none'; if(q&&any)cat.classList.remove('collapsed'); }); }
 let pkTabs=[], pkActiveRel=null, pkDrafts={}, pkCurEditRel=null;
 function pkIcon(cat){ return (pkDetail&&pkDetail.labels[cat]&&pkDetail.labels[cat][0])||'📄'; }
-function captureDraft(){ if(pkEditCM&&pkCurEditRel){ try{ pkDrafts[pkCurEditRel]=pkEditCM.getValue(); }catch(e){} } pkEditCM=null; pkCurEditRel=null; }
+function captureDraft(){ if(pkEditCM&&pkCurEditRel){ try{ pkDrafts[pkCurEditRel]=pkEditCM.getValue(); }catch(e){} } if(pkEditCM){ try{ pkEditCM.toTextArea(); }catch(e){} } pkEditCM=null; pkCurEditRel=null; }
 function openTab(relEnc,cat){ const rel=decodeURIComponent(relEnc); if(!pkTabs.some(t=>t.rel===rel)) pkTabs.push({rel,cat}); activateTab(relEnc); }
 function activateTab(relEnc){ const rel=decodeURIComponent(relEnc); captureDraft(); pkActiveRel=rel; const tab=pkTabs.find(t=>t.rel===rel); if(!tab)return; renderTabs();
   document.querySelectorAll('#pkTree .pk-item').forEach(it=>it.classList.toggle('active', it.getAttribute('data-rel')===encodeURIComponent(rel)));
   const insp=$('pkInsp'); if(!insp)return;
   if(tab.cat==='models') pkModel(rel,insp); else if(tab.cat==='textures') pkImage(rel,insp); else pkJson(rel,tab.cat,insp);
 }
-function closeTab(relEnc,ev){ if(ev)ev.stopPropagation(); const rel=decodeURIComponent(relEnc); if(pkCurEditRel===rel){ pkEditCM=null; pkCurEditRel=null; } delete pkDrafts[rel];
+function closeTab(relEnc,ev){ if(ev)ev.stopPropagation(); const rel=decodeURIComponent(relEnc); if(pkCurEditRel===rel){ if(pkEditCM){ try{ pkEditCM.toTextArea(); }catch(e){} } pkEditCM=null; pkCurEditRel=null; } delete pkDrafts[rel];
   const i=pkTabs.findIndex(t=>t.rel===rel); if(i<0)return; pkTabs.splice(i,1);
   if(pkActiveRel===rel){ const nxt=pkTabs[i]||pkTabs[i-1]; if(nxt) activateTab(encodeURIComponent(nxt.rel)); else { pkActiveRel=null; renderTabs(); if(pkDetail)pkOverview(pkDetail); } }
   else renderTabs();
+  csNoteDirty();
 }
 function renderTabs(){ const t=$('pkTabs'); if(!t)return;
   t.innerHTML=pkTabs.map(tb=>{ const e=encodeURIComponent(tb.rel); const act=tb.rel===pkActiveRel?' active':''; const dirty=(tb.rel in pkDrafts)?'<span class="tdot">●</span>':'';
@@ -2388,7 +2389,7 @@ function jsonHL(obj){
 let pkEditCM=null, pkEditRel=null, pkEditRaw='';
 function pkCatOf(rel){ if(!pkDetail)return ''; for(const g of ['datapack','resource']) for(const c in (pkDetail.groups[g]||{})) if((pkDetail.groups[g][c]||[]).some(it=>it.rel===rel)) return c; return ''; }
 async function pkJson(rel,cat,insp){
-  pkEditCM=null;
+  if(pkEditCM){ try{ pkEditCM.toTextArea(); }catch(e){} } pkEditCM=null;
   const nm=rel.split('/').pop(); const lab=(pkDetail&&pkDetail.labels[cat])||['📄',cat];
   insp.innerHTML='<div class="pk-insp-head"><span class="e">'+lab[0]+'</span><b>'+esc(nm)+'</b><span class="meta">'+esc(rel)+'</span><button class="btn small" id="pkEditBtn" style="margin-left:8px" onclick="pkEdit()">✏️ Editar</button></div><pre class="pk-json" id="pkJsonBody">Cargando…</pre>';
   const r=await apiPost('/api/readfile',{path:lastRoot,rel});
@@ -2411,16 +2412,17 @@ function pkEdit(){
   const ta=$('pkTa'); ta.value=(pkEditRel in pkDrafts)?pkDrafts[pkEditRel]:pkEditRaw;
   pkEditCM=CodeMirror.fromTextArea(ta,{mode:{name:'javascript',json:pkEditRel.endsWith('.json')},theme:'material-darker',lineNumbers:true,autoCloseBrackets:true,matchBrackets:true,indentUnit:2,tabSize:2,lineWrapping:false});
   pkEditCM.setSize('100%','100%');
-  pkEditCM.on('change',()=>{ const was=(pkCurEditRel in pkDrafts); pkDrafts[pkCurEditRel]=pkEditCM.getValue(); if(!was)renderTabs(); });
+  pkEditCM.on('change',()=>{ const was=(pkCurEditRel in pkDrafts); pkDrafts[pkCurEditRel]=pkEditCM.getValue(); if(!was)renderTabs(); csNoteDirty(); });
   setTimeout(()=>pkEditCM&&pkEditCM.refresh(),60);
 }
-function pkCancelEdit(){ const rel=pkEditRel; delete pkDrafts[rel]; pkEditCM=null; pkCurEditRel=null; renderTabs(); pkJson(rel, pkCatOf(rel), $('pkInsp')); }
+function pkCancelEdit(){ const rel=pkEditRel; delete pkDrafts[rel]; if(pkEditCM){ try{ pkEditCM.toTextArea(); }catch(e){} } pkEditCM=null; pkCurEditRel=null; renderTabs(); pkJson(rel, pkCatOf(rel), $('pkInsp')); csNoteDirty(); }
 async function pkSave(){
   if(!pkEditCM||!pkEditRel)return; const txt=pkEditCM.getValue(); const msg=$('pkEditMsg');
   if(pkEditRel.endsWith('.json')){ try{ JSON.parse(txt); }catch(e){ if(msg){msg.style.color='var(--err)';msg.textContent='✖ JSON inválido: '+e.message;} return; } }
   const r=await apiPost('/api/writefile',{path:lastRoot,rel:pkEditRel,text:txt});
   if(r&&r.error){ if(msg){msg.style.color='var(--err)';msg.textContent='✖ '+r.error;} return; }
   pkEditRaw=txt; delete pkDrafts[pkEditRel]; renderTabs(); if(msg){msg.style.color='var(--ok)';msg.textContent='✓ Guardado';}
+  csNoteDirty();
 }
 async function pkImage(rel,insp){
   const nm=rel.split('/').pop();
@@ -2483,7 +2485,13 @@ function assistantRender(id){ const a=ASSIST[id]; if(!a) return;
     asstEnsure3D(); asstClearModel(); asstLoadModels(); const s=$('asstSearch'); if(s) s.value=''; const hud=$('asstHud'); if(hud) hud.textContent='elige un Pokémon'; }
   else if(pick){ pick.innerHTML=''; }
   window.scrollTo({top:0,behavior:'smooth'}); }
-function exitAssist(){ document.body.classList.remove('assist','asst-model'); const g=$('btnGen'); if(g) g.textContent='Generar'; }
+function exitAssist(){ document.body.classList.remove('assist','asst-model'); const g=$('btnGen'); if(g) g.textContent='Generar';
+  // libera el visor 3D del asistente (corta el loop y suelta WebGL para evitar fugas)
+  asst3dReady=false;   // asstLoop sale en el próximo frame; asstEnsure3D lo reconstruye al volver
+  if(asstRenderer){ try{ asstRenderer.dispose(); }catch(e){} asstRenderer=null; }
+  asstScene=null; asstCam=null; asstControls=null; asstCanvas=null;
+  asstCurrent=null; asstClip=null; asstCurGeo=null; asstCurDefTex=null; asstUserTex=null; asstCurAnim=null;
+}
 function assistAgain(){ $('assistDone').classList.add('hide'); if(assistKind){ $('cards').innerHTML=''; addCard(assistKind); window.scrollTo({top:0,behavior:'smooth'}); } }
 
 // ===== Visor 3D del asistente (tipos que tocan un Pokémon) =====
@@ -2629,6 +2637,12 @@ function assistDone(r){ const n=(s)=>(r.results||[]).filter(x=>x.status===s).len
 function navExport(){ openAppTab('exportar','Exportar .zip','⬇️',()=>{ revealEditor(); setActiveNav('exportar'); const f=document.querySelector('.foot'); if(f) f.scrollIntoView({behavior:'smooth'}); }); }
 function navGuide(){ openAppTab('guia','Guía','📖',()=>{ openGuide(); setActiveNav('guia'); }); }
 function toggleSide(){ const s=$('appside'); if(!s) return; s.classList.toggle('collapsed'); try{localStorage.setItem('gd_side', s.classList.contains('collapsed')?'1':'0');}catch(e){} }
+function restoreSidebar(){ try{ const w=localStorage.getItem('cs_side_w'); if(w) document.documentElement.style.setProperty('--side-w', w+'px'); if(localStorage.getItem('gd_side')==='1'){ const s=$('appside'); if(s) s.classList.add('collapsed'); } }catch(e){} }
+(function(){ const r=$('sideResize'); if(!r) return; let dz=null;
+  r.addEventListener('pointerdown',e=>{ dz={x:e.clientX,w:$('appside').getBoundingClientRect().width}; r.setPointerCapture(e.pointerId); e.preventDefault(); });
+  window.addEventListener('pointermove',e=>{ if(!dz) return; const nw=Math.max(150,Math.min(380,dz.w+(e.clientX-dz.x))); document.documentElement.style.setProperty('--side-w',nw+'px'); });
+  window.addEventListener('pointerup',()=>{ if(dz){ try{ localStorage.setItem('cs_side_w', Math.round($('appside').getBoundingClientRect().width)); }catch(e){} dz=null; } });
+})();
 function applyGoParam(){ try{ const g=new URLSearchParams(location.search).get('go'); if(!g) return; const map={nuevo:()=>location.href='/creator.html',aspecto:()=>assistant('aspecto'),variante:()=>assistant('variante'),complemento:()=>assistant('complemento'),evolucion:()=>assistant('evolucion'),aparezca:()=>assistant('aparezca'),montar:()=>assistant('montar'),pokedex:()=>assistant('pokedex'),berry:()=>assistant('berry'),fossil:()=>assistant('fossil'),mark:()=>assistant('mark'),pokerod:()=>assistant('pokerod'),seasoning:()=>assistant('seasoning'),recipe:()=>assistant('recipe'),textos:()=>assistant('textos'),explorar:()=>navPack(),estado:()=>navPack(),exportar:()=>navExport(),guia:()=>navGuide()}; (map[g]||(()=>{}))(); }catch(e){} }
 
 // ===== LAUNCHER / PROYECTO (modelo IDE: siempre hay un pack abierto) =====
@@ -2656,6 +2670,11 @@ function openProject(root, name){
   const pn=$('projName'); if(pn) pn.textContent=name||root;
   $('launcher').classList.add('hide');
   appTabs=[]; appActive=null; pkRenderedRoot=null;   // pack nuevo → pestañas desde cero
+  // resetea estado global del proyecto anterior (editor/asistente/pestañas del pack)
+  if(pkEditCM){ try{ pkEditCM.toTextArea(); }catch(e){} } pkEditCM=null; pkEditRel=null; pkEditRaw=''; pkCurEditRel=null;
+  pkTabs=[]; pkActiveRel=null; pkDrafts={};
+  assistKind=null; asstCurId=null;
+  document.body.classList.remove('assist','asst-model');
   document.querySelectorAll('#frameScreen iframe').forEach(f=>{ try{ f.src='about:blank'; }catch(e){} f.remove(); });   // libera WebGL/recursos de iframes del pack anterior (PROJECT stale)
   navHome(); refreshPackInfo();
 }
@@ -2672,8 +2691,18 @@ async function restoreOrLaunch(){
 
 setupTabs();
 restoreNavCats();
+restoreSidebar();
 // auto-actualización: comprueba GitHub Releases al arrancar; si instala algo, ofrece reiniciar
 async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+// ===== anti-pérdida de datos: avisar al cerrar la app si hay trabajo sin guardar =====
+function csComputeUnsaved(){
+  for(const key of ['paint','paintpng','creator','reskin']){ const fr=document.querySelector('#frameScreen iframe[data-frame="'+key+'"]'); try{ if(fr&&fr.contentWindow&&fr.contentWindow.csFrameDirty&&fr.contentWindow.csFrameDirty()) return true; }catch(e){} }
+  try{ if(Object.keys(pkDrafts||{}).length) return true; }catch(e){}
+  return false;
+}
+let _unsavedT=null;
+function csNoteDirty(){ clearTimeout(_unsavedT); _unsavedT=setTimeout(()=>{ try{ csInvoke('set_unsaved',{flag:csComputeUnsaved()}); }catch(e){} }, 250); }
+window.csNoteDirty=csNoteDirty;   // los iframes lo llaman cuando cambia su estado
 async function checkForUpdates(){
   try{ const r=await csInvoke('check_and_update');
     if(typeof r==='string' && r.indexOf('updated')===0){
@@ -2685,16 +2714,54 @@ async function checkForUpdates(){
 function updRestart(){ csInvoke('restart_app').catch(()=>{}); }
 checkForUpdates();
 try{ if(localStorage.getItem('gd_side')==='1') $('appside').classList.add('collapsed'); }catch(e){}
-(function(){ let m='easy'; try{ m=localStorage.getItem('gd_mode')||'easy'; }catch(e){} setMode(m); })();
+goHome();
 checkResume();
 setActiveNav('inicio');
 restoreOrLaunch();   // restaura el pack abierto o pide elegir (modelo IDE)
 $('cards').addEventListener('input',autosaveProject);
 $('cards').addEventListener('change',autosaveProject);
+// botones de subir archivo: tono verde cuando ya hay archivo (en vez de un tick aparte). Delegado → cubre asistentes/filas creados dinámicamente
+document.addEventListener('change',e=>{ const inp=e.target; if(!inp||inp.type!=='file') return; const b=inp.closest('label.btn,.btn'); if(b) b.classList.toggle('loaded',!!(inp.files&&inp.files.length)); });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){ if(!$('fileView').classList.contains('hide'))$('fileView').classList.add('hide'); else if(!$('picker').classList.contains('hide'))closePicker(); else if(!$('objMenu').classList.contains('hide'))$('objMenu').classList.add('hide'); }
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&!$('panelContent').classList.contains('hide')) generate();
 });
+
+// ===== menús contextuales (clic derecho) =====
+if(window.ctxMenu){
+  // pestañas de la app
+  ctxMenu.register('.apptab', el=>{ const id=el.dataset.tabid; const others=appTabs.filter(t=>t.id!==id);
+    return [
+      {icon:'↗',label:'Ir a esta pestaña',action:()=>activateAppTab(id)},
+      {sep:true},
+      {icon:'✕',label:'Cerrar',action:()=>closeAppTab(id)},
+      {icon:'⊟',label:'Cerrar las demás',disabled:!others.length,action:()=>others.map(t=>t.id).forEach(x=>closeAppTab(x))},
+      {icon:'⊠',label:'Cerrar todas',action:()=>appTabs.slice().map(t=>t.id).forEach(x=>closeAppTab(x))},
+    ];
+  });
+  // bloques de contenido (tarjetas)
+  ctxMenu.register('.card', el=>{ const click=rx=>{ const b=[...el.querySelectorAll('.head .actions button')].find(x=>rx.test(x.textContent)); if(b) b.click(); };
+    return [
+      {icon:'⧉',label:'Duplicar bloque',action:()=>click(/duplic/i)},
+      {icon:'{}',label:'Ver / ocultar JSON',action:()=>click(/json/i)},
+      {icon:'?',label:'Ayuda del bloque',action:()=>click(/ayuda/i)},
+      {sep:true},
+      {icon:'🗑',label:'Eliminar bloque',danger:true,action:()=>{ const d=el.querySelector('.head .actions .del'); if(d) d.click(); }},
+    ];
+  });
+  // archivos del inspector del pack
+  ctxMenu.register('.pk-item', el=>{ const rel=decodeURIComponent(el.dataset.rel||'');
+    return [
+      {icon:'📂',label:'Abrir',action:()=>el.click()},
+      {icon:'⧉',label:'Copiar ruta',action:()=>{ try{ navigator.clipboard.writeText(rel); }catch(e){} }},
+    ];
+  });
+  // por defecto (zonas sin opciones propias): navegación rápida
+  ctxMenu.fallback(()=>[
+    {icon:'🏠',label:'Inicio',action:()=>navHome()},
+    {icon:'📖',label:'Guía',action:()=>{ if(typeof navGuide==='function') navGuide(); }},
+  ]);
+}
 </script>
 </body>
 </html>

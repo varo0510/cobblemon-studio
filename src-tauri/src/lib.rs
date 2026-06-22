@@ -6,7 +6,12 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use base64::Engine;
-use tauri_plugin_dialog::DialogExt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+
+// flag "hay cambios sin guardar" que el frontend mantiene al día; se consulta al cerrar la ventana
+struct UnsavedFlag(AtomicBool);
 
 const ASSETS_REPO: &str = "D:/Kyobble2/herramientas/cobblemon-assets"; // clon dev opcional
 const GITLAB_BASE: &str = "https://gitlab.com/cable-mc/cobblemon-assets/-/raw/master/";
@@ -234,6 +239,7 @@ fn pack_detail(path: String) -> Value {
 fn read_pack_file(path: String, rel: String) -> Value {
     if rel.contains("..") { return json!({"error": "ruta inválida"}); }
     let full = Path::new(&path).join(rel.replace('\\', "/"));
+    if !full.starts_with(Path::new(&path)) { return json!({"error": "fuera del pack"}); }
     if !full.is_file() { return json!({"error": "no encontrado"}); }
     let low = rel.to_lowercase();
     if low.ends_with(".png") || low.ends_with(".ogg") || low.ends_with(".nbt") {
@@ -246,6 +252,7 @@ fn read_pack_file(path: String, rel: String) -> Value {
 fn read_pack_image(path: String, rel: String) -> Value {
     if rel.contains("..") { return json!({"error": "ruta inválida"}); }
     let full = Path::new(&path).join(rel.replace('\\', "/"));
+    if !full.starts_with(Path::new(&path)) { return json!({"error": "fuera del pack"}); }
     if !full.is_file() { return json!({"error": "no encontrado"}); }
     if fs::metadata(&full).map(|m| m.len()).unwrap_or(0) > 8_000_000 { return json!({"error": "imagen demasiado grande"}); }
     match fs::read(&full) { Ok(b) => json!({"base64": b64(&b)}), Err(e) => json!({"error": e.to_string()}) }
@@ -651,6 +658,12 @@ fn restart_app(app: tauri::AppHandle) {
     app.restart();
 }
 
+// el frontend avisa si hay trabajo sin guardar (pintura, ediciones del pack, asistentes…)
+#[tauri::command]
+fn set_unsaved(state: tauri::State<UnsavedFlag>, flag: bool) {
+    state.0.store(flag, Ordering::Relaxed);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -658,11 +671,27 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         // (sin auto-abrir DevTools: la app arranca limpia)
+        .manage(UnsavedFlag(AtomicBool::new(false)))
+        // anti-pérdida de datos: si hay cambios sin guardar, confirmar antes de cerrar la ventana
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let dirty = window.state::<UnsavedFlag>().0.load(Ordering::Relaxed);
+                if dirty {
+                    api.prevent_close();
+                    let w = window.clone();
+                    window.dialog()
+                        .message("Hay cambios sin guardar. Si cierras ahora se perderán.")
+                        .title("Cambios sin guardar")
+                        .buttons(MessageDialogButtons::OkCancelCustom("Cerrar igualmente".to_string(), "Cancelar".to_string()))
+                        .show(move |ok| { if ok { let _ = w.destroy(); } });
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             pick_folder, project_create, project_open, pack_info, list_models,
             get_model, write_pack, build_zips, open_folder, update_assets,
             pack_detail, read_pack_file, read_pack_image, delete_file, pack_verify, write_file,
-            check_and_update, restart_app
+            check_and_update, restart_app, set_unsaved
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

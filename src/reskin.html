@@ -25,6 +25,7 @@
 <!-- Tauri: builders (window.CSB) en el webview + puente /api->invoke -->
 <script src="/builders.js"></script>
 <script src="/tauri-shim.js"></script>
+<script src="/ctxmenu.js"></script>
 <style>
   input[type=file]{display:none}
   #c{width:100%;height:100%;display:block}
@@ -52,6 +53,8 @@
   .step h3{display:inline;font-size:14px}
   #okbox{display:none;background:color-mix(in srgb,var(--ok) 12%,var(--panel2));border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));border-radius:var(--r2);padding:var(--s4);margin-top:var(--s3)}
   #err{color:var(--err);font-size:12px;margin-top:var(--s2);white-space:pre-wrap;font-family:var(--font-mono)}
+  /* boton girar: estado activo en accent (coherente con creator) */
+  #spinbtn.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 </style></head>
 <body class="app">
 <header class="topbar">
@@ -145,10 +148,10 @@
   <section id="right" class="split-right">
     <canvas id="c"></canvas>
     <div class="viewer-toolbar">
-      <button class="btn small" onclick="toggleAnim()" id="animbtn" title="animación">▶</button>
-      <button class="btn small" onclick="spin=!spin" title="girar">↻</button>
+      <button class="btn small" onclick="toggleAnim()" id="animbtn" title="animación" aria-label="Reproducir/pausar animación">▶</button>
+      <button class="btn small" id="spinbtn" onclick="spin=!spin;$('spinbtn').classList.toggle('active',spin)" title="girar" aria-label="Girar modelo">↻</button>
     </div>
-    <div id="hud" class="hud">elige un Pokémon</div>
+    <div id="hud" class="hud" role="status" aria-live="polite">elige un Pokémon</div>
   </section>
 </main>
 
@@ -255,8 +258,14 @@ async function doBuild(){
   $('okbox').style.display='block';
 }
 
+// botones de subir archivo: tono verde cuando ya hay archivo (en vez de un tick aparte)
+document.addEventListener('change',e=>{ const inp=e.target; if(!inp||inp.type!=='file') return; const b=inp.closest('label.btn,.btn'); if(b) b.classList.toggle('loaded',!!(inp.files&&inp.files.length)); });
 // init
 (function(){ const el=$('proj'); if(PROJECT&&PROJECT.root){ el.querySelector('span:last-child').textContent=PROJECT.name||'pack'; el.title=PROJECT.root; } else { el.className='status-badge off'; el.querySelector('span:last-child').textContent='sin pack'; } })();
+$('spinbtn').classList.toggle('active', spin);
 loadModels();
+// menú contextual (clic derecho): el menú de campos de texto es automático; aquí un fallback de navegación
+if(window.ctxMenu){ const P=()=>{ try{ return window.parent&&window.parent!==window?window.parent:null; }catch(e){ return null; } };
+  ctxMenu.fallback(()=>{ const p=P(); return [ {icon:'🏠',label:'Inicio',action:()=>{ if(p&&p.navHome) p.navHome(); }}, {icon:'📖',label:'Guía',action:()=>{ if(p&&p.navGuide) p.navGuide(); }} ]; }); }
 </script>
 </body></html>
