@@ -1,0 +1,262 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cobblemon Studio — Reskin</title>
+<!-- Tokens en /studio.css (fuente única). -->
+<link rel="stylesheet" href="/studio.css">
+<!-- modo embebido (?embed=1): dentro de una pestaña/iframe de index.html.
+     html.embed oculta SU cabecera+sidebar (los aporta index) y se interceptan los enlaces
+     internos para reenrutarlos a las pestañas del padre (nunca sacar la app del iframe). -->
+<script>
+(function(){ if(new URLSearchParams(location.search).get('embed')!=='1') return;
+  document.documentElement.classList.add('embed');
+  var ROUTES={'/':'navHome','/creator.html':'navCreator','/reskin.html':'navReskin','/?go=estado':'navPack','/?go=explorar':'navPack','/?go=exportar':'navExport','/?go=guia':'navGuide'};
+  var ASSIST={variante:1,complemento:1,evolucion:1,aparezca:1,pokedex:1,montar:1,berry:1,fossil:1,mark:1,pokerod:1,seasoning:1,recipe:1,textos:1};
+  function P(){ try{ return (window.parent&&window.parent!==window)?window.parent:null; }catch(e){ return null; } }
+  document.addEventListener('click', function(e){
+    var a=e.target.closest&&e.target.closest('a[href]'); if(!a) return;
+    var href=a.getAttribute('href'); if(!href||href.charAt(0)!=='/') return;   // solo enlaces internos
+    e.preventDefault(); var p=P(); if(!p) return;
+    var fn=ROUTES[href]; if(fn&&typeof p[fn]==='function'){ p[fn](); return; }
+    var m=href.match(/^\/\?go=([a-z]+)$/); if(m&&ASSIST[m[1]]&&typeof p.assistant==='function'){ p.assistant(m[1]); return; }
+    /* desconocido: bloqueado, no navegamos fuera del iframe */
+  }, true);
+})();
+</script>
+<!-- Tauri: builders (window.CSB) en el webview + puente /api->invoke -->
+<script src="/builders.js"></script>
+<script src="/tauri-shim.js"></script>
+<style>
+  input[type=file]{display:none}
+  #c{width:100%;height:100%;display:block}
+  /* conmutador de fuente (lista / importar), estilo segmentado */
+  .srcswitch{display:flex;gap:4px;margin:8px 0 10px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--r2);padding:3px;width:fit-content}
+  .srcbtn{padding:6px 14px;font-size:12.5px;font-weight:600;color:var(--dim);background:transparent;border:0;border-radius:var(--r1);cursor:pointer}
+  .srcbtn:hover{color:var(--text)}
+  .srcbtn.on{background:var(--accent);color:var(--on-accent)}
+  .imp-row{display:flex;gap:8px;flex-wrap:wrap}
+  .impf{flex:1;min-width:140px;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .impf input{text-transform:none;font-weight:400}
+  /* lista compacta en cuadrícula (más agradable y ocupa menos) */
+  #rlist{max-height:36vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);background:var(--panel2);
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px;padding:5px;align-content:start}
+  #rlist .mrow{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 9px;border-radius:var(--r1);
+    cursor:pointer;font-size:12px;background:var(--panel);border:1px solid transparent;white-space:nowrap;overflow:hidden}
+  #rlist .mrow:hover{background:var(--panel2);border-color:var(--line)}
+  #rlist .mrow.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  #rlist .mrow>span:first-child{overflow:hidden;text-overflow:ellipsis}
+  #rlist .mrow .tag{font-size:9px;opacity:.55;flex:0 0 auto;text-transform:uppercase;letter-spacing:.04em}
+  #rlist .mrow.active .tag{opacity:.85;color:var(--on-accent)}
+  #rlist .mrow.full{grid-column:1/-1;cursor:default;justify-content:flex-start;color:var(--dim)}
+  .step{margin-bottom:18px}
+  .step .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:700;margin-right:8px}
+  .step h3{display:inline;font-size:14px}
+  #okbox{display:none;background:color-mix(in srgb,var(--ok) 12%,var(--panel2));border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));border-radius:var(--r2);padding:var(--s4);margin-top:var(--s3)}
+  #err{color:var(--err);font-size:12px;margin-top:var(--s2);white-space:pre-wrap;font-family:var(--font-mono)}
+</style></head>
+<body class="app">
+<header class="topbar">
+  <button class="btn icon sidetoggle" onclick="toggleSide()" aria-label="Menú" title="Menú">
+    <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
+  </button>
+  <div class="brand"><div class="logo" aria-hidden="true"></div><span class="name">Cobblemon <b>Studio</b></span></div>
+  <div class="topactions">
+    <span id="proj" class="status-badge"><span class="dot"></span><span>—</span></span>
+    <span class="pill">Reskin</span>
+  </div>
+</header>
+<main class="app-main">
+  <aside class="appside" id="appside">
+    <a class="snav-item" href="/"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 7 8 2l6 5M3.5 6.5V14h9V6.5"/></svg> Inicio</a>
+    <div class="snav-group"><div class="snav-title">Crear</div>
+      <a class="snav-item" href="/creator.html"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11" opacity=".5"/><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none"/></svg> Pokémon nuevo</a>
+      <a class="snav-item sub on" href="/reskin.html" aria-current="page">Reskin / aspecto</a>
+      <a class="snav-item sub" href="/?go=variante">Forma regional</a>
+      <a class="snav-item sub" href="/?go=complemento">Cosmético</a>
+      <a class="snav-item sub" href="/?go=evolucion">Evolución</a>
+    </div>
+    <div class="snav-group"><div class="snav-title">Mundo</div>
+      <a class="snav-item sub" href="/?go=aparezca">Apariciones</a>
+      <a class="snav-item sub" href="/?go=pokedex">Pokédex</a>
+      <a class="snav-item sub" href="/?go=montar">Montura</a>
+    </div>
+    <div class="snav-group"><div class="snav-title">Objetos</div>
+      <a class="snav-item sub" href="/?go=berry">Bayas</a>
+      <a class="snav-item sub" href="/?go=fossil">Fósiles</a>
+      <a class="snav-item sub" href="/?go=mark">Marcas</a>
+      <a class="snav-item sub" href="/?go=pokerod">Cañas</a>
+      <a class="snav-item sub" href="/?go=seasoning">Materiales / cocina</a>
+      <a class="snav-item sub" href="/?go=recipe">Recetas</a>
+    </div>
+    <div class="snav-group"><div class="snav-title">Mi pack</div>
+      <a class="snav-item sub" href="/?go=estado">Contenido del pack</a>
+      <a class="snav-item sub" href="/?go=exportar">Exportar .zip</a>
+    </div>
+  </aside>
+
+  <section id="left" class="split-left">
+    <h2 style="font-size:16px;border:0;margin:0 0 4px">🎨 Reskin / nuevo aspecto</h2>
+    <p class="hint" style="margin-bottom:16px">Dale a un Pokémon que ya existe una textura tuya (dorado, navideño, tu shiny…). No cambia el original: se añade como un aspecto.</p>
+
+    <div class="step">
+      <div class="n">1</div><h3>Elige el Pokémon</h3>
+      <div class="srcswitch">
+        <button class="srcbtn on" id="src-list" onclick="setSrc('list')">📚 De la lista</button>
+        <button class="srcbtn" id="src-import" onclick="setSrc('import')">📥 Importar modelo</button>
+      </div>
+
+      <div id="pane-list">
+        <input id="search" placeholder="🔍 Buscar Pokémon…" oninput="filterList()" style="margin:0 0 8px">
+        <div id="rlist"><div class="mrow full">Cargando…</div></div>
+      </div>
+
+      <div id="pane-import" style="display:none">
+        <div class="imp-row">
+          <label class="btn small">🧊 Modelo .geo.json<input type="file" accept=".json" onchange="impGeo(this.files[0])"></label>
+          <label class="btn small">🖼️ Textura base .png<input type="file" accept=".png" onchange="impTex(this.files[0])"></label>
+        </div>
+        <div class="imp-row" style="margin-top:8px">
+          <label class="impf"><span>Especie destino (id)</span><input id="imp-sp" placeholder="p. ej. pikachu" oninput="impSync()"></label>
+          <label class="impf"><span>Carpeta (opcional)</span><input id="imp-folder" placeholder="= especie" oninput="impSync()"></label>
+        </div>
+        <p class="hint" id="impinfo" style="margin-top:8px">Sube tu <code>.geo.json</code> para verlo en el visor. El modelo base debe existir ya en tu pack o en Cobblemon; aquí añades la textura/aspecto.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="n">2</div><h3>Tu textura (.png)</h3>
+      <div class="row" style="gap:8px;margin-top:8px;align-items:center">
+        <label class="btn small">🖼️ Subir textura<input type="file" accept=".png" onchange="upTex(this.files[0])"></label>
+        <label class="ctl"><input type="checkbox" id="showOrig" onchange="toggleOrig(this.checked)"> ver original</label>
+        <span class="hint" id="texinfo">— sin textura —</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="n">3</div><h3>Nombre del aspecto</h3>
+      <input id="aspect" placeholder="dorado" style="margin-top:8px;max-width:240px">
+      <p class="hint">En el juego se activará con ese aspecto (ej. <code>/givepokemon pikachu aspect=dorado</code>).</p>
+    </div>
+
+    <button class="btn btn-ok" id="go" onclick="doBuild()" style="width:100%;padding:12px;font-size:14px">✓ Crear y añadir al pack</button>
+    <div id="okbox"></div>
+    <div id="err"></div>
+  </section>
+
+  <section id="right" class="split-right">
+    <canvas id="c"></canvas>
+    <div class="viewer-toolbar">
+      <button class="btn small" onclick="toggleAnim()" id="animbtn" title="animación">▶</button>
+      <button class="btn small" onclick="spin=!spin" title="girar">↻</button>
+    </div>
+    <div id="hud" class="hud">elige un Pokémon</div>
+  </section>
+</main>
+
+<script src="/vendor/three.min.js"></script>
+<script src="/vendor/OrbitControls.js"></script>
+<script src="/geo-three-reference.js"></script>
+<script src="/anim-bedrock.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+function toggleSide(){ const s=$('appside'); if(!s) return; s.classList.toggle('collapsed'); try{ localStorage.setItem('gd_side', s.classList.contains('collapsed')?'1':'0'); }catch(e){} }
+try{ if(localStorage.getItem('gd_side')==='1') $('appside').classList.add('collapsed'); }catch(e){}
+const PROJECT = (()=>{ try{ return JSON.parse(localStorage.getItem('cs_current')||'null'); }catch(e){ return null; } })();
+function splitPath(p){ const s=String(p).replace(/[\\/]+$/,''); const i=Math.max(s.lastIndexOf('\\'),s.lastIndexOf('/')); return {parent:s.slice(0,i),base:s.slice(i+1)}; }
+async function apiPost(url,body){ try{ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return await r.json(); }catch(e){ return {error:'No se pudo conectar: '+e.message}; } }
+
+// ---- estado ----
+let allModels=[], picked=null;           // picked: {name, geo, folder}
+let cur={geo:null, defTex:null, userTex:null, animation:null};
+let spin=true, animOn=true, clip=null, animStart=0, current=null;
+
+// ---- 3D (motor probado) ----
+const canvas=$('c');
+const scene=new THREE.Scene(); scene.background=new THREE.Color('#15110d');
+const camera=new THREE.PerspectiveCamera(45,1,0.1,5000); camera.position.set(0,20,60);
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const controls=new THREE.OrbitControls(camera,canvas); controls.enableDamping=true;
+scene.add(new THREE.AmbientLight(0xffffff,0.85));
+const dl=new THREE.DirectionalLight(0xffffff,0.85); dl.position.set(40,80,50); scene.add(dl);
+scene.add(new THREE.GridHelper(64,16,0x3a3026,0x2f261d));
+function resize(){ const w=canvas.clientWidth,h=canvas.clientHeight; if(canvas.width!==w||canvas.height!==h){ renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); } }
+function loop(){ requestAnimationFrame(loop); resize(); if(current){ if(animOn&&clip) window.applyAnimClip(current,clip,(performance.now()-animStart)/1000); if(spin) current.rotation.y+=0.01; } controls.update(); renderer.render(scene,camera); }
+loop();
+function frameModel(o){ const b=new THREE.Box3().setFromObject(o),c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); o.position.sub(c); o.position.y+=s.y/2; const r=Math.max(s.x,s.y,s.z)||16; camera.position.set(r*1.25,s.y*0.65+r*0.45,-r*1.7); controls.target.set(0,s.y*0.45,0); controls.update(); }
+const loadTex=url=>new Promise(res=>{ if(!url) return res(null); new THREE.TextureLoader().load(url,t=>res(t),undefined,()=>res(null)); });
+async function renderModel(){
+  if(!cur.geo){ if(current){scene.remove(current);current=null;} $('hud').textContent='elige un Pokémon'; return; }
+  const url=(!$('showOrig').checked && cur.userTex) ? cur.userTex : cur.defTex;
+  const tex=await loadTex(url);
+  if(current) scene.remove(current);
+  try{ current=window.geoToThreeGroup(cur.geo,tex); clip=cur.animation?window.buildAnimClip(cur.animation):null; animStart=performance.now(); scene.add(current); frameModel(current); $('hud').textContent=(picked?picked.name:'')+(cur.userTex&&!$('showOrig').checked?' · tu skin':' · original'); }
+  catch(e){ $('hud').textContent='error: '+e.message; }
+}
+function toggleAnim(){ animOn=!animOn; $('animbtn').textContent=animOn?'▶':'⏸'; if(!animOn&&current) window.resetToRest(current); }
+function toggleOrig(){ renderModel(); }
+
+// ---- lista de modelos ----
+async function loadModels(){ const r=await fetch('/api/preview/models').then(r=>r.json()).catch(()=>({models:[]})); allModels=r.models||[]; renderList(allModels); }
+function renderList(ms){ const el=$('rlist'); if(!ms.length){ el.innerHTML='<div class="mrow full">sin resultados</div>'; return; } el.innerHTML='';
+  for(const m of ms.slice(0,1000)){ const d=document.createElement('div'); d.className='mrow'; d.title=m.name;
+    d.innerHTML='<span>'+m.name.replace(/_/g,' ')+'</span>'+(m.gen?'<span class="tag">'+m.gen+'</span>':'');
+    d.onclick=()=>{ document.querySelectorAll('#rlist .mrow.active').forEach(x=>x.classList.remove('active')); d.classList.add('active'); pick(m); }; el.appendChild(d); } }
+// ---- fuente del modelo: lista oficial vs importar el tuyo ----
+let srcMode='list';
+function setSrc(m){ srcMode=m;
+  $('src-list').classList.toggle('on', m==='list'); $('src-import').classList.toggle('on', m==='import');
+  $('pane-list').style.display=m==='list'?'':'none'; $('pane-import').style.display=m==='import'?'':'none';
+  if(m==='list'){ if(picked&&picked.imported) picked=null; } else { impSync(); }
+}
+function impGeo(f){ if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const g=JSON.parse(r.result);
+    cur={geo:g, defTex:cur.defTex||null, userTex:cur.userTex||null, animation:null}; $('showOrig').checked=false;
+    $('impinfo').textContent='✓ modelo cargado — '+(f.name||''); renderModel();
+  }catch(e){ errMsg('El .geo.json no es válido.'); } }; r.readAsText(f); }
+function impTex(f){ if(!f) return; const r=new FileReader(); r.onload=()=>{ cur.defTex=r.result; if(cur.geo) renderModel(); }; r.readAsDataURL(f); }
+function impSync(){ const sp=slug($('imp-sp').value); const folder=slug($('imp-folder').value)||sp;
+  picked = sp ? {name:sp, geo:null, folder, imported:true} : (picked&&picked.imported?null:picked);
+  if(current) $('hud').textContent=(sp||'modelo importado')+(cur.userTex&&!$('showOrig').checked?' · tu skin':' · base'); }
+function filterList(){ const q=$('search').value.toLowerCase(); renderList(allModels.filter(m=>m.name.toLowerCase().includes(q))); }
+async function pick(m){
+  const folder=m.geo.replace(/\/[^/]+$/,'').split('/').pop();   // p.ej. 0025_pikachu
+  picked={name:m.name, geo:m.geo, folder};
+  $('hud').textContent='cargando '+m.name+'…';
+  const r=await fetch('/api/preview/model?geo='+encodeURIComponent(m.geo)).then(r=>r.json()).catch(()=>({error:'no se pudo cargar el modelo'}));
+  if(r.error){ $('hud').textContent=r.error; return; }
+  cur={geo:r.geo, defTex:r.texture, userTex:null, animation:r.animation};
+  $('showOrig').checked=false; $('texinfo').textContent='— sin textura —';
+  renderModel();
+}
+
+function upTex(f){ if(!f) return; const r=new FileReader(); r.onload=()=>{ cur.userTex=r.result; $('showOrig').checked=false; $('texinfo').textContent='✓ '+f.name; if(cur.geo) renderModel(); }; r.readAsDataURL(f); }
+const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'');
+function errMsg(m){ $('err').textContent=m?('✖ '+m):''; }
+// "Ver mi pack": si estamos embebidos en una pestaña de index.html, abre allí la pestaña del pack; si no, navega.
+function verPack(){ try{ if(window.parent&&window.parent!==window&&window.parent.navPack){ window.parent.navPack(); return; } }catch(e){} /* embebido: no navegamos fuera del iframe */ }
+
+async function doBuild(){
+  errMsg(''); $('okbox').style.display='none';
+  if(!PROJECT||!PROJECT.root) return errMsg('No hay pack abierto. Vuelve al Inicio y abre o crea un pack.');
+  if(!picked) return errMsg(srcMode==='import' ? 'Escribe la especie destino (id) en «Importar modelo».' : 'Elige el Pokémon a reskinear (paso 1).');
+  if(!cur.userTex) return errMsg('Sube tu textura .png (paso 2).');
+  const aspect=slug($('aspect').value)|| 'reskin';
+  const sp=picked.name;
+  const texRel='assets/cobblemon/textures/pokemon/'+picked.folder+'/'+sp+'_'+aspect+'.png';
+  const btn=$('go'); btn.disabled=true; btn.textContent='⏳ Creando…';
+  const body={ target:{mode:'existing',path:PROJECT.root}, overwrite:true,
+    items:[{kind:'wizreskin', target:'cobblemon:'+sp, aspect, folder:picked.folder, order:1}],
+    rawFiles:[{rel:texRel, base64:String(cur.userTex).replace(/^data:[^,]+,/,'')}] };
+  const r=await apiPost('/api/generate',body);
+  btn.disabled=false; btn.textContent='✓ Crear y añadir al pack';
+  if(r.error) return errMsg(r.error);
+  const ok=(r.results||[]).filter(x=>x.status==='written'||x.status==='merged').length;
+  $('okbox').innerHTML='<b style="color:var(--ok)">✓ ¡Reskin añadido a tu pack!</b><div class="hint" style="margin-top:6px">'+ok+' archivo(s). Aspecto: <code>'+aspect+'</code> sobre <code>'+sp+'</code>.</div>'+
+    '<div class="row" style="gap:8px;margin-top:10px"><button class="btn small" onclick="$(\'okbox\').style.display=\'none\'">Otro reskin</button><button class="btn small" onclick="verPack()">Ver mi pack</button></div>';
+  $('okbox').style.display='block';
+}
+
+// init
+(function(){ const el=$('proj'); if(PROJECT&&PROJECT.root){ el.querySelector('span:last-child').textContent=PROJECT.name||'pack'; el.title=PROJECT.root; } else { el.className='status-badge off'; el.querySelector('span:last-child').textContent='sin pack'; } })();
+loadModels();
+</script>
+</body></html>

@@ -1,0 +1,450 @@
+/* =====================================================================
+   studio.css — Design system unico de "Cobblemon Studio"
+   Direccion: Forge Dark warm — superficie oscura, densa y silenciosa;
+   UNA sola firma de color (rojo-pokeball mate) reservada a ACCION/FOCO/ACTIVO.
+   Compartido por index.html, preview.html y creator.html.
+   Enlazar en las TRES paginas:  <link rel="stylesheet" href="/studio.css">
+
+   IMPORTANTE: este archivo es la UNICA fuente de verdad de tokens.
+   Si tocas un color, tocalo SOLO aqui. No redeclarar :root en los HTML.
+   ===================================================================== */
+
+/* ---------- TOKENS (la unica fuente de verdad) ---------- */
+:root{
+  /* Superficies (oscuras, calidas-neutras) */
+  --bg:#0e1014;            /* fondo app, look "hundido" para inputs */
+  --bg2:#12151b;           /* fondo secundario / pista de scroll */
+  --panel:#161a21;         /* paneles, header, sidebar */
+  --panel2:#1c212a;        /* tarjetas, controles, hover de panel */
+  --line:#272d37;          /* borde 1px casi imperceptible (no bajar mas) */
+  --line2:#343c48;         /* borde en hover/foco suave */
+
+  /* Texto */
+  --text:#e7eaf0;          /* texto principal */
+  --dim:#929cab;           /* texto secundario (AA sobre panel; no bajar) */
+  --faint:#6b7483;         /* placeholders, hints muy terciarios */
+
+  /* FIRMA DE MARCA: rojo-pokeball mate. SOLO accion/foco/activo. */
+  --accent:#e4453d;        /* primario solido, item activo, anillo de foco */
+  --accent2:#ff7d76;       /* datos tecnicos mono atenuados, hover del primario */
+  --on-accent:#1a0907;     /* texto sobre relleno accent (oscuro, peso 700) */
+  --accent-ring:rgba(228,69,61,.26); /* ring de foco 3px */
+
+  /* Estados (separados del rojo-accion: error es GHOST, nunca relleno) */
+  --ok:#46c98a;            /* write / exito */
+  --warn:#e3b341;          /* aviso */
+  --err:#ef6a63;           /* error: SOLO texto/borde, jamas relleno solido */
+  --skip:#8a93a3;          /* skip / neutro en logs */
+
+  /* Colores por categoria (UNICO sitio donde sobreviven; apagados a IDE).
+     Se usan SOLO como borde-izquierdo 3px de cards y punto de grupo. */
+  --cat-pokemon:#d49a52;   /* ambar */
+  --cat-spawning:#5f97c4;  /* azul */
+  --cat-pokedex:#d4736b;   /* coral */
+  --cat-objetos:#5bbf8a;   /* verde */
+  --cat-resource:#a87fc9;  /* morado */
+  --cat-asistente:#e4453d; /* = accent (tareas) */
+  --cat-mundo:#94a0ad;     /* gris */
+
+  /* Visor 3D: grid + escena retintada a calidos apagados (no azul frio) */
+  --scene-bg:#15110d;      /* fondo de la escena three.js */
+  --grid-major:#3a3026;    /* lineas mayores del grid */
+  --grid-minor:#2f261d;    /* lineas menores del grid */
+
+  /* Escala de espaciado (8pt-ish, densidad alta) */
+  --s1:4px;  --s2:8px;  --s3:12px;  --s4:16px;  --s5:22px;  --s6:32px;
+
+  /* Radios (conservadores, look IDE) */
+  --r1:6px;  --r2:8px;  --r-pill:7px;
+
+  /* Tipografia */
+  --font-ui:"Inter","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono","Cascadia Code",Consolas,ui-monospace,monospace;
+
+  /* Sombra: UNA sola, reservada a overlays/modales */
+  --shadow:0 18px 48px rgba(0,0,0,.55);
+
+  /* Transicion estandar (micro-animaciones 120-160ms) */
+  --t:.14s ease;
+}
+
+/* ---------- RESET ---------- */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;color:var(--text);
+  font:13px/1.5 var(--font-ui);
+  /* un solo radial calido MUY sutil; nada de arcoiris */
+  background:
+    radial-gradient(1100px 560px at 88% -18%, rgba(228,69,61,.05), transparent 62%),
+    var(--bg);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+/* numeros siempre tabulares: stats/IDs/conteos no "bailan" */
+body{font-variant-numeric:tabular-nums}
+
+/* ---------- SCROLLBARS (finas, tematicas) ---------- */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;border:2px solid var(--bg2)}
+::-webkit-scrollbar-thumb:hover{background:var(--line2)}
+
+/* ---------- TIPOGRAFIA ---------- */
+h1{margin:0;font-size:16px;font-weight:650;letter-spacing:.1px}
+h2{margin:0;font-size:13px;font-weight:600}
+/* titulo de panel: MAYUSCULAS, dim, tracking */
+.panel-title,
+.panel>h2{
+  margin:0 0 var(--s3);font-size:12px;font-weight:600;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--dim);
+  border-bottom:1px solid var(--line);padding-bottom:var(--s3);
+  display:flex;align-items:center;gap:var(--s2);
+}
+small{color:var(--dim)}
+.label,label{display:block;color:var(--dim);font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.04em;margin:var(--s3) 0 var(--s1)}
+.hint{color:var(--dim);font-size:11px;line-height:1.45;margin-top:var(--s1)}
+.faint{color:var(--faint)}
+
+/* TODO lo tecnico va en mono atenuado, NUNCA en prosa */
+.mono,code,pre,.path,.ns,.expitem .sm,.chkpath,.kv code,.exitem .sm{
+  font-family:var(--font-mono);font-size:11.5px;color:var(--accent2);
+  font-variant-numeric:tabular-nums;
+}
+code{background:#0a0c10;padding:1px 6px;border-radius:5px}
+pre{margin:0}
+
+/* ---------- LOGO POKEBALL (disco partido mate, monocromo + acento) ---------- */
+.logo{
+  width:30px;height:30px;border-radius:50%;flex:0 0 auto;position:relative;
+  background:linear-gradient(180deg,var(--accent) 0 50%, #c9ccd3 50% 100%);
+  border:1px solid rgba(0,0,0,.5);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+}
+.logo::before{content:"";position:absolute;left:0;right:0;top:50%;height:2px;
+  transform:translateY(-50%);background:rgba(0,0,0,.55)}
+.logo::after{content:"";position:absolute;left:50%;top:50%;width:9px;height:9px;
+  border-radius:50%;transform:translate(-50%,-50%);
+  background:#11141a;box-shadow:0 0 0 2px rgba(0,0,0,.5),0 0 0 3px #c9ccd3}
+
+/* ---------- TOPBAR (header sticky 48px, identico en las 3 paginas) ---------- */
+.topbar{
+  position:sticky;top:0;z-index:20;height:48px;
+  display:flex;align-items:center;gap:var(--s3);
+  padding:0 var(--s4);
+  background:color-mix(in srgb,var(--panel) 92%, transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:var(--s2);flex:0 0 auto}
+.brand .name{font-size:13px;font-weight:650;letter-spacing:.2px;white-space:nowrap}
+.brand .name b{color:var(--accent2);font-weight:650}
+
+/* Conmutador segmentado de navegacion (3 destinos, activo por URL) */
+.nav{display:flex;align-items:center;border:1px solid var(--line);
+  border-radius:var(--r2);overflow:hidden;background:var(--panel2)}
+.nav a{
+  display:inline-flex;align-items:center;gap:var(--s2);
+  padding:6px 12px;font-size:12px;font-weight:600;color:var(--dim);
+  text-decoration:none;border-right:1px solid var(--line);
+  transition:color var(--t),background var(--t);white-space:nowrap;
+}
+.nav a:last-child{border-right:0}
+.nav a:hover{color:var(--text);background:color-mix(in srgb,var(--accent) 8%, transparent)}
+.nav a[aria-current="page"]{
+  background:var(--accent);color:var(--on-accent);
+}
+.nav a .ic{width:14px;height:14px;flex:0 0 auto}
+/* En preview/creator (saturados de controles) la nav colapsa a iconos */
+.nav.compact a span{display:none}
+.nav.compact a{padding:7px 10px}
+
+/* Zona de acciones contextuales a la derecha de la topbar */
+.topactions{margin-left:auto;display:flex;align-items:center;gap:var(--s2)}
+
+/* Badge de estado discreto (carpeta de salida / "Al dia") */
+.status-badge{display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--dim);font-family:var(--font-mono);
+  background:var(--bg);border:1px solid var(--line);
+  border-radius:var(--r1);padding:4px 9px;max-width:280px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:0 0 auto}
+.status-badge.warn .dot{background:var(--warn)}
+.status-badge.off .dot{background:var(--faint)}
+
+/* ---------- PILL / CHIP informativo (no accionable) ---------- */
+.pill{display:inline-flex;align-items:center;font-size:11px;
+  font-family:var(--font-mono);color:var(--dim);
+  background:var(--bg);border:1px solid var(--line);
+  border-radius:var(--r1);padding:2px 8px}
+
+/* ---------- WRAP / CANVAS DE CONTENIDO ---------- */
+.wrap{max-width:1000px;margin:0 auto;padding:var(--s5) var(--s5) 110px}
+
+/* ---------- PANELES / CARDS ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--r2);padding:var(--s5);margin-bottom:var(--s5)}
+.panel>h2 .num{display:inline-grid;place-items:center;width:20px;height:20px;
+  border-radius:50%;background:var(--accent);color:var(--on-accent);
+  font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.card{background:var(--panel2);border:1px solid var(--line);
+  border-left:3px solid var(--c,var(--line2));
+  border-radius:var(--r2);padding:var(--s3) var(--s4);margin-bottom:var(--s3)}
+/* UNICO sitio de los colores de categoria */
+.card[data-cat=pokemon],.group[data-cat=pokemon]{--c:var(--cat-pokemon)}
+.card[data-cat=spawning],.group[data-cat=spawning]{--c:var(--cat-spawning)}
+.card[data-cat=pokedex],.group[data-cat=pokedex]{--c:var(--cat-pokedex)}
+.card[data-cat=objetos],.group[data-cat=objetos]{--c:var(--cat-objetos)}
+.card[data-cat=resource],.group[data-cat=resource]{--c:var(--cat-resource)}
+.card[data-cat=asistente],.group[data-cat=asistente]{--c:var(--cat-asistente)}
+.card[data-cat=mundo],.group[data-cat=mundo]{--c:var(--cat-mundo)}
+
+.card .head{display:flex;align-items:center;gap:var(--s2);margin-bottom:var(--s2)}
+.card .head b{font-size:13px;color:var(--text);font-weight:600}
+.card .actions{margin-left:auto;display:flex;gap:var(--s1)}
+.card .cardhelp{color:var(--dim);font-size:11px;margin-top:var(--s1)}
+.jsonprev{font-family:var(--font-mono);font-size:11px;color:var(--accent2);
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--r1);
+  padding:var(--s2);margin-top:var(--s2);white-space:pre-wrap;max-height:220px;overflow:auto}
+
+/* ---------- GRUPOS / ETIQUETA DE CATEGORIA ---------- */
+.group{margin-bottom:var(--s4)}
+.group .lbl{font-size:10.5px;color:var(--dim);text-transform:uppercase;
+  letter-spacing:.08em;margin-bottom:var(--s2);display:flex;align-items:center;gap:var(--s2)}
+.group .lbl::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c,var(--dim))}
+.addbar{display:flex;flex-wrap:wrap;gap:var(--s2)}
+
+/* ---------- FORMULARIOS ---------- */
+input[type=text],input[type=number],input:not([type]),select,textarea{
+  width:100%;background:var(--bg);border:1px solid var(--line);
+  border-radius:var(--r2);color:var(--text);padding:8px 10px;
+  font:13px/1.4 var(--font-ui);
+  transition:border-color var(--t),box-shadow var(--t),background var(--t);
+}
+textarea{resize:vertical;min-height:64px;font-family:var(--font-mono);font-size:12px}
+input::placeholder,textarea::placeholder{color:var(--faint);font-style:italic}
+input:hover,select:hover,textarea:hover{border-color:var(--line2)}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-ring);
+}
+input:disabled,select:disabled,textarea:disabled{opacity:.45;cursor:not-allowed}
+/* flecha CSS propia para selects (cero apariencia nativa) */
+select{appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),
+                   linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 52%,calc(100% - 11px) 52%;
+  background-size:5px 5px;background-repeat:no-repeat;padding-right:28px}
+/* color input compacto */
+input[type=color]{width:34px;height:30px;padding:2px;border-radius:var(--r2);
+  background:var(--bg);border:1px solid var(--line);cursor:pointer}
+
+.row{display:flex;gap:var(--s3);flex-wrap:wrap}
+.row>div,.field{flex:1;min-width:120px}
+.field{display:flex;flex-direction:column;gap:var(--s1)}
+
+/* Validacion inline: leyenda = verde ok / ambar aviso / rojo error */
+input.ac-ok,select.ac-ok{border-color:color-mix(in srgb,var(--ok) 60%,var(--line))}
+input.ac-warn,select.ac-warn{border-color:var(--warn)}
+input.ac-err,select.ac-err{border-color:var(--err)!important;
+  box-shadow:0 0 0 3px rgba(239,106,99,.22)}
+
+/* ---------- BOTONES ---------- */
+button,.btn{
+  font:600 13px/1 var(--font-ui);cursor:pointer;
+  border-radius:var(--r2);border:1px solid var(--line);
+  background:var(--panel2);color:var(--text);
+  padding:8px 13px;display:inline-flex;align-items:center;gap:var(--s2);
+  transition:border-color var(--t),background var(--t),transform var(--t);
+}
+button:hover,.btn:hover{border-color:var(--line2);transform:translateY(-1px)}
+button:active,.btn:active{transform:translateY(0)}
+button:focus-visible,.btn:focus-visible,a:focus-visible{
+  outline:none;box-shadow:0 0 0 3px var(--accent-ring);border-color:var(--accent)}
+button:disabled,.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* UN solo primario por vista: relleno accent SOLIDO (sin gradiente), peso 700 */
+button.primary,.btn.primary{
+  background:var(--accent);border-color:var(--accent);
+  color:var(--on-accent);font-weight:700}
+button.primary:hover,.btn.primary:hover{background:var(--accent2);border-color:var(--accent2)}
+
+/* "ok" reservado a confirmaciones de exito (build) — relleno verde mate */
+button.btn-ok,button.ok{background:var(--ok);border-color:var(--ok);color:#06140d;font-weight:700}
+button.btn-ok:hover,button.ok:hover{filter:brightness(1.06)}
+
+/* peligro = GHOST (texto/borde danger que se rellena al hover) */
+button.del,.btn.danger{color:var(--err);border-color:transparent;background:transparent}
+button.del:hover,.btn.danger:hover{background:color-mix(in srgb,var(--err) 14%,transparent);
+  border-color:var(--err);transform:none}
+
+button.small,.btn.small{padding:5px 10px;font-size:12px;border-radius:var(--r1)}
+/* icon-only: cuadrado, requiere aria-label */
+button.icon{padding:7px;width:32px;height:32px;justify-content:center}
+
+/* ---------- TABS / PILLS DE PASOS (stepper) ---------- */
+.tabs{display:flex;gap:var(--s2);flex-wrap:wrap}
+.tab,.tabbtn{padding:7px 12px;border-radius:var(--r1);background:var(--panel2);
+  border:1px solid var(--line);cursor:pointer;font-size:12px;font-weight:600;
+  color:var(--dim);transition:color var(--t),background var(--t),border-color var(--t)}
+.tab:hover,.tabbtn:hover{color:var(--text)}
+.tab.on,.tabbtn.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+.steps{display:flex;gap:var(--s2);align-items:center}
+.pill-step,.steps .pill{font-size:12px;padding:5px 11px;border-radius:var(--r-pill);
+  background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+  font-variant-numeric:tabular-nums;font-weight:600}
+.steps .pill.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:700}
+.steps .pill.done{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+.steps .pill.done::before{content:"\2713 ";font-weight:700}
+
+/* ---------- GRIDS (landing por objetivos / inventario) ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--s3)}
+.goalgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--s3)}
+.goalcard{background:var(--panel2);border:1px solid var(--line);
+  border-left:3px solid var(--c,var(--line2));border-radius:var(--r2);
+  padding:var(--s4);cursor:pointer;display:flex;flex-direction:column;gap:var(--s1);
+  transition:border-color var(--t),transform var(--t)}
+.goalcard[data-c=pokemon]{--c:var(--cat-pokemon)}
+.goalcard[data-c=spawning]{--c:var(--cat-spawning)}
+.goalcard[data-c=pokedex]{--c:var(--cat-pokedex)}
+.goalcard[data-c=objetos]{--c:var(--cat-objetos)}
+.goalcard[data-c=resource]{--c:var(--cat-resource)}
+.goalcard[data-c=mundo]{--c:var(--cat-mundo)}
+.goalcard:hover{border-color:var(--c,var(--line2));transform:translateY(-1px)}
+.goalcard b{font-size:13.5px;color:var(--text);font-weight:600}
+.goalcard span{font-size:12px;color:var(--dim);line-height:1.45}
+.goalcard em{font-size:11px;color:var(--accent2);font-style:normal;font-family:var(--font-mono)}
+.goaltitle{margin:0 0 var(--s2);font-size:20px;font-weight:650;letter-spacing:-.2px}
+.goalsub{margin:0 0 var(--s5);color:var(--dim);font-size:13px}
+.goalfoot{color:var(--dim);font-size:12px;margin-top:var(--s4);line-height:1.5}
+.goalfoot a{color:var(--accent2)}
+
+/* chips de inventario */
+.invgrid{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.invchip{display:flex;align-items:center;gap:var(--s2);background:var(--panel2);
+  border:1px solid var(--line);border-radius:18px;padding:4px 11px;font-size:12px}
+.invchip b{color:var(--accent2);font-family:var(--font-mono)}
+
+/* ---------- LAYOUT APP (visor / creator) ---------- */
+.app{height:100vh;display:flex;flex-direction:column}
+.app-main{flex:1;display:flex;min-height:0}
+.sidebar{width:250px;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0}
+.stage{flex:1;position:relative;min-width:0;background:var(--scene-bg)}
+.stage canvas{width:100%;height:100%;display:block}
+.split-left{width:50%;overflow:auto;padding:var(--s5);border-right:1px solid var(--line)}
+.split-right{flex:1;position:relative;min-width:0;background:var(--scene-bg)}
+
+/* lista de modelos */
+.mrow{padding:7px 9px;border-radius:var(--r1);cursor:pointer;font-size:12px;
+  color:var(--dim);display:flex;justify-content:space-between;gap:var(--s2);
+  transition:background var(--t),color var(--t)}
+.mrow:hover{background:var(--panel2);color:var(--text)}
+.mrow.active{background:var(--accent);color:var(--on-accent);font-weight:600}
+.mrow .tag{font-size:10px;opacity:.7;font-family:var(--font-mono)}
+
+/* ---------- HUD / TOOLBAR DEL VISOR ---------- */
+.hud{position:absolute;left:var(--s3);bottom:var(--s3);font-size:11px;
+  color:#cfd6e0;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:var(--r2);
+  font-family:var(--font-mono);pointer-events:none;border:1px solid rgba(255,255,255,.06)}
+.viewer-toolbar{position:absolute;right:var(--s3);top:var(--s3);
+  display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(8px);
+  border:1px solid var(--line);border-radius:var(--r2);padding:var(--s2)}
+.ctl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim)}
+.ctl input[type=checkbox]{accent-color:var(--accent)}
+
+/* ---------- TOASTS / RESULTADOS (mono; write=ok merge=accent2 skip=dim err=danger) ---------- */
+.results,.log{font-family:var(--font-mono);font-size:11.5px;line-height:1.6;
+  background:var(--bg);border:1px solid var(--line);border-radius:var(--r2);
+  padding:var(--s3);max-height:340px;overflow:auto}
+.log-write{color:var(--ok)}
+.log-merge{color:var(--accent2)}
+.log-skip{color:var(--skip)}
+.log-error{color:var(--err)}
+
+/* banner de error del visor (role=alert) */
+.err-banner{position:absolute;left:50%;top:var(--s4);transform:translateX(-50%);
+  background:color-mix(in srgb,var(--err) 16%,#1a0d0d);color:#ffc2bd;
+  border:1px solid var(--err);padding:8px 14px;border-radius:var(--r2);
+  font-size:12px;display:none;max-width:80%}
+
+/* ---------- MODALES / OVERLAYS ---------- */
+.overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--r2);
+  box-shadow:var(--shadow);max-width:min(700px,94vw);width:100%;max-height:86vh;
+  display:flex;flex-direction:column;overflow:hidden}
+.modal .modal-body{overflow:auto;padding:var(--s4)}
+
+/* ---------- ESTADOS GENERALES ---------- */
+.hide{display:none!important}
+.sumcard{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r2);
+  padding:var(--s4);margin-bottom:var(--s3)}
+.kv{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;
+  border-bottom:1px dashed var(--line)}
+.bar{height:6px;border-radius:3px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;background:var(--accent)}
+
+/* ---------- UTILIDADES DE ESPACIO/FLEX ---------- */
+.sp{flex:1}
+.flex{display:flex}.flex-col{display:flex;flex-direction:column}
+.items-center{align-items:center}.justify-between{justify-content:space-between}
+.gap-1{gap:var(--s1)}.gap-2{gap:var(--s2)}.gap-3{gap:var(--s3)}
+.mt-1{margin-top:var(--s1)}.mt-2{margin-top:var(--s2)}.mt-3{margin-top:var(--s3)}
+.mb-2{margin-bottom:var(--s2)}.mb-3{margin-bottom:var(--s3)}
+.wfull{width:100%}.tabnum{font-variant-numeric:tabular-nums}
+
+/* ---------- SIDEBAR DE NAVEGACIÓN GLOBAL (árbol único de la app) ---------- */
+:root{ --side-w:214px }
+/* shell: debajo de la topbar, fila [sidebar | main] que ocupa el resto del alto */
+.app-shell{flex:1;display:flex;min-height:0}
+.appside{width:var(--side-w);flex:0 0 auto;background:var(--panel);
+  border-right:1px solid var(--line);overflow-y:auto;overflow-x:hidden;
+  padding:var(--s3) var(--s2) var(--s5);display:flex;flex-direction:column;gap:1px}
+.appside.collapsed{display:none}
+/* main de index: el .wrap scrollea, el footer queda fijo abajo */
+.appmain{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.appmain>.wrap{flex:1;width:100%;overflow-y:auto}
+.appmain>.foot{position:static;flex:0 0 auto}
+
+/* ---------- MODO EMBEBIDO (?embed=1): la pagina va dentro de una pestaña/iframe de index.html.
+   Ocultamos SU cabecera y SU sidebar (index ya los aporta); se conserva el footer del wizard
+   de creator (es <footer class="topbar">, no <header>). Gated por html.embed → no afecta a index. */
+html.embed body>header.topbar{display:none !important}
+html.embed .app-main>aside.appside{display:none !important}
+
+/* grupos y títulos del árbol */
+.snav-group{margin-top:var(--s3)}
+.snav-title{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint);padding:0 var(--s3);margin:0 0 var(--s1)}
+/* item del árbol (sirve como <a> o como acción) */
+.snav-item{display:flex;align-items:center;gap:9px;padding:7px var(--s3);border-radius:var(--r1);
+  font-size:12.5px;font-weight:500;color:var(--dim);cursor:pointer;text-decoration:none;
+  border:1px solid transparent;transition:color var(--t),background var(--t);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.snav-item:hover{background:var(--panel2);color:var(--text)}
+.snav-item.on,.snav-item[aria-current="page"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+.snav-item .ic{width:15px;height:15px;flex:0 0 auto;opacity:.9}
+.snav-item.sub{padding-left:30px;font-size:12px}            /* sub-item indentado */
+.snav-sep{height:1px;background:var(--line);margin:var(--s2) var(--s3)}
+/* botón hamburguesa para plegar la sidebar (en la topbar) */
+.sidetoggle{margin-right:var(--s1)}
+
+/* RESPONSIVE de la sidebar: en estrecho se pliega sola y el toggle la saca como overlay */
+@media(max-width:980px){
+  .appside{position:absolute;top:0;bottom:0;left:0;z-index:30;box-shadow:var(--shadow)}
+  .appside.collapsed{display:none}
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media(max-width:880px){
+  .nav a span{display:none}      /* nav colapsa a iconos en estrecho */
+  .split-left{width:100%;border-right:0;border-bottom:1px solid var(--line)}
+  .app-main{flex-direction:column}
+  .sidebar{width:100%;max-height:200px}
+}

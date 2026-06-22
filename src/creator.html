@@ -1,0 +1,434 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cobblemon Studio — Crear Pokémon</title>
+<!-- Tokens de color/tipografia viven SOLO en studio.css (fuente unica de verdad).
+     No redeclarar :root aqui: evita la divergencia historica (#5b9cff vs accent). -->
+<link rel="stylesheet" href="/studio.css">
+<!-- modo embebido (?embed=1): dentro de una pestaña/iframe de index.html.
+     html.embed oculta SU cabecera+sidebar (los aporta index) y se interceptan los enlaces
+     internos para reenrutarlos a las pestañas del padre (nunca sacar la app del iframe). -->
+<script>
+(function(){ if(new URLSearchParams(location.search).get('embed')!=='1') return;
+  document.documentElement.classList.add('embed');
+  var ROUTES={'/':'navHome','/creator.html':'navCreator','/reskin.html':'navReskin','/?go=estado':'navPack','/?go=explorar':'navPack','/?go=exportar':'navExport','/?go=guia':'navGuide'};
+  var ASSIST={variante:1,complemento:1,evolucion:1,aparezca:1,pokedex:1,montar:1,berry:1,fossil:1,mark:1,pokerod:1,seasoning:1,recipe:1,textos:1};
+  function P(){ try{ return (window.parent&&window.parent!==window)?window.parent:null; }catch(e){ return null; } }
+  document.addEventListener('click', function(e){
+    var a=e.target.closest&&e.target.closest('a[href]'); if(!a) return;
+    var href=a.getAttribute('href'); if(!href||href.charAt(0)!=='/') return;   // solo enlaces internos
+    e.preventDefault(); var p=P(); if(!p) return;
+    var fn=ROUTES[href]; if(fn&&typeof p[fn]==='function'){ p[fn](); return; }
+    var m=href.match(/^\/\?go=([a-z]+)$/); if(m&&ASSIST[m[1]]&&typeof p.assistant==='function'){ p.assistant(m[1]); return; }
+    /* desconocido: bloqueado, no navegamos fuera del iframe */
+  }, true);
+})();
+</script>
+<!-- Tauri: builders (window.CSB) en el webview + puente /api->invoke -->
+<script src="/builders.js"></script>
+<script src="/tauri-shim.js"></script>
+<style>
+  /* CSS especifico de creator.html que studio.css NO cubre.
+     Layout app/split, inputs, botones, tabs, mrow, statgrid, sumcard, etc.
+     ya los aporta studio.css. */
+  input[type=file]{display:none}
+  /* el canvas llena su contenedor (#right.split-right); resize() lee clientWidth/Height */
+  #c{width:100%;height:100%;display:block}
+  /* paso 2: barra por stat (la .bar de studio.css es relleno solido accent) */
+  .statbar{display:flex;align-items:center;gap:var(--s2);margin-top:var(--s1)}
+  .statbar .bar{flex:1}
+  /* campos del wizard: studio.css estiliza inputs/select/textarea por elemento,
+     pero el markup usa .f / .f.grow / label.lab — los mapeamos a la escala comun */
+  .f{display:flex;flex-direction:column;gap:var(--s1)}
+  .f.grow{flex:1;min-width:120px}
+  label.lab{display:block;font-size:11px;color:var(--dim);font-weight:600;
+    text-transform:uppercase;letter-spacing:.04em;margin:0}
+  .chk{display:flex;align-items:center;gap:var(--s2);font-size:13px;color:var(--text)}
+  .chk input[type=checkbox]{accent-color:var(--accent)}
+  /* lista de modelos reutilizables (studio.css estiliza las filas .mrow) */
+  /* lista compacta en cuadrícula (igual que reskin: más agradable y ocupa menos) */
+  #mlist{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);background:var(--panel2);
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px;padding:5px;align-content:start}
+  #mlist .mrow{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 9px;border-radius:var(--r1);
+    cursor:pointer;font-size:12px;background:var(--panel);border:1px solid transparent;white-space:nowrap;overflow:hidden}
+  #mlist .mrow:hover{background:var(--panel2);border-color:var(--line)}
+  #mlist .mrow.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  #mlist .mrow>span:first-child{overflow:hidden;text-overflow:ellipsis}
+  #mlist .mrow .tag{font-size:9px;opacity:.55;flex:0 0 auto;text-transform:uppercase;letter-spacing:.04em}
+  #mlist .mrow.active .tag{opacity:.85;color:var(--on-accent)}
+  #mlist .mrow.full{grid-column:1/-1;cursor:default;justify-content:flex-start;color:var(--dim)}
+  /* contenedor de spawn: solo opacidad/disabled lo togglea el JS */
+  #spawnbox{transition:opacity var(--t)}
+  /* caja de exito del paso 4 (ghost verde, no relleno) */
+  #okbox{display:none;background:color-mix(in srgb,var(--ok) 12%,var(--panel2));
+    border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));
+    border-radius:var(--r2);padding:var(--s4);margin-top:var(--s3)}
+  /* error = texto danger, nunca relleno (separado del primario rojo) */
+  #err{color:var(--err);font-size:12px;margin-top:var(--s2);white-space:pre-wrap;font-family:var(--font-mono)}
+  /* boton girar: estado activo en accent (coherente con el resto de "activo") */
+  #spinbtn.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  /* ====== WIZARD: un paso a la vez + maquetación con aire ====== */
+  .stepwrap{display:none}
+  .stepwrap.on{display:block;animation:wizin .18s ease}
+  @keyframes wizin{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  #left.split-left{padding:0;display:flex;flex-direction:column;overflow:hidden}
+  .wiz-head{flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);padding:13px 20px}
+  .wiz-head .steps{display:flex;gap:6px;justify-content:space-between}
+  .wiz-head .steps .pill{flex:1;justify-content:center;text-align:center}
+  .wiz-body{flex:1;min-height:0;overflow:auto;padding:20px 24px 22px}
+  .wiz-inner{max-width:680px;width:100%;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+  .stepwrap h2{font-size:17px;font-weight:650;color:var(--text);text-transform:none;letter-spacing:0;border:0;padding:0;margin:0 0 4px}
+  .stepwrap>.hint{margin:0 0 16px}
+  .stepwrap .row{margin-bottom:12px}
+  .stepwrap .card{margin:6px 0 14px}
+  .stepwrap textarea{min-height:80px}
+  /* el paso "modelo" llena el alto: la lista crece hasta el pie y no deja hueco */
+  #s0.stepwrap.on{flex:1;min-height:0;display:flex;flex-direction:column}
+  #pane-reuse{flex:1;min-height:0;display:flex;flex-direction:column}
+  #pane-reuse #mlist{flex:1;max-height:none}
+</style></head>
+<body class="app">
+<header class="topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"></div>
+    <span class="name">Cobblemon <b>Studio</b></span>
+  </div>
+
+  <button class="btn icon sidetoggle" onclick="toggleSide()" aria-label="Mostrar u ocultar el menú" title="Menú">
+    <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
+  </button>
+
+  <div class="topactions">
+    <span id="creatorProj" class="status-badge" style="margin-right:10px"><span class="dot"></span><span>—</span></span>
+  </div>
+</header>
+<main class="app-main">
+  <aside class="appside" id="appside">
+    <a class="snav-item" href="/"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 7 8 2l6 5M3.5 6.5V14h9V6.5"/></svg> Inicio</a>
+    <div class="snav-group"><div class="snav-title">Crear</div>
+      <a class="snav-item on" href="/creator.html" aria-current="page"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11" opacity=".5"/><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none"/></svg> Pokémon nuevo</a>
+      <a class="snav-item sub" href="/reskin.html">Reskin / aspecto</a>
+      <a class="snav-item sub" href="/?go=variante">Forma regional</a>
+      <a class="snav-item sub" href="/?go=complemento">Cosmético</a>
+      <a class="snav-item sub" href="/?go=evolucion">Evolución</a>
+    </div>
+    <div class="snav-group"><div class="snav-title">Mundo</div>
+      <a class="snav-item sub" href="/?go=aparezca">Apariciones</a>
+      <a class="snav-item sub" href="/?go=pokedex">Pokédex</a>
+      <a class="snav-item sub" href="/?go=montar">Montura</a>
+    </div>
+    <div class="snav-group"><div class="snav-title">Objetos</div>
+      <a class="snav-item sub" href="/?go=berry">Bayas</a>
+      <a class="snav-item sub" href="/?go=fossil">Fósiles</a>
+      <a class="snav-item sub" href="/?go=mark">Marcas</a>
+      <a class="snav-item sub" href="/?go=pokerod">Cañas</a>
+      <a class="snav-item sub" href="/?go=seasoning">Materiales / cocina</a>
+      <a class="snav-item sub" href="/?go=recipe">Recetas</a>
+    </div>
+    <div class="snav-group"><div class="snav-title">Recursos</div>
+      <a class="snav-item sub" href="/?go=textos">Nombres / idiomas</a>
+    </div>
+    <a class="snav-item" href="/preview.html"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M8 2 14 5.2v5.6L8 14 2 10.8V5.2L8 2Z"/><path d="M2 5.2 8 8.4l6-3.2M8 8.4V14"/></svg> Visor 3D</a>
+    <div class="snav-group"><div class="snav-title">Mi pack</div>
+      <a class="snav-item sub" href="/?go=estado">Estado</a>
+      <a class="snav-item sub" href="/?go=explorar">Explorar</a>
+      <a class="snav-item sub" href="/?go=exportar">Exportar .zip</a>
+    </div>
+    <div class="snav-sep"></div>
+    <a class="snav-item" href="/?go=guia"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 2.5h6.5a2 2 0 0 1 2 2V14H5a2 2 0 0 0-2 1.5V2.5Z"/></svg> Guía y ayuda</a>
+  </aside>
+  <section id="left" class="split-left">
+    <div class="wiz-head">
+      <div class="steps" aria-label="Progreso">
+        <span class="pill on" id="p0">1 · Modelo</span>
+        <span class="pill" id="p1">2 · Especie</span>
+        <span class="pill" id="p2">3 · Mundo</span>
+        <span class="pill" id="p3">4 · Exportar</span>
+      </div>
+    </div>
+    <div class="wiz-body"><div class="wiz-inner">
+    <!-- PASO 1: MODELO -->
+    <div class="stepwrap on" id="s0">
+      <h2>1 · Elige el cuerpo</h2>
+      <p class="hint">Reutiliza un modelo del repo oficial (1207) o sube el tuyo de Blockbench (.geo.json + textura).</p>
+      <div class="tabs">
+        <div class="tab on" id="tab-reuse" onclick="setTab('reuse')">Reutilizar</div>
+        <div class="tab" id="tab-upload" onclick="setTab('upload')">Subir el mío</div>
+      </div>
+      <div id="pane-reuse">
+        <input id="msearch" placeholder="Buscar modelo…" oninput="filterModels()" class="wfull mb-2">
+        <div id="mlist"><div class="mrow">Cargando…</div></div>
+      </div>
+      <div id="pane-upload" style="display:none">
+        <div class="row">
+          <label class="btn">Modelo .geo.json<input type="file" accept=".json,.geo.json" onchange="upGeo(this.files[0])"></label>
+          <label class="btn">Textura .png<input type="file" accept=".png" onchange="upTex(this.files[0],'tex')"></label>
+        </div>
+        <div class="row">
+          <label class="btn">Shiny .png (opc.)<input type="file" accept=".png" onchange="upTex(this.files[0],'shiny')"></label>
+          <label class="btn">Animación (opc.)<input type="file" accept=".json,.animation.json" onchange="upAnim(this.files[0])"></label>
+        </div>
+        <p class="hint" id="upinfo">Sin archivos.</p>
+      </div>
+    </div>
+    <!-- PASO 2: ESPECIE -->
+    <div class="stepwrap" id="s1">
+      <h2>2 · Datos de la especie</h2>
+      <p class="hint">Lo esencial para que cargue y se sienta como un Pokémon de verdad.</p>
+      <div class="row">
+        <div class="f grow"><label class="lab">Nombre</label><input id="f-name" placeholder="Drakomon" oninput="syncName()"></div>
+        <div class="f"><label class="lab">Nº Pokédex</label><input id="f-dex" type="number" value="9001"></div>
+      </div>
+      <div class="row">
+        <div class="f grow"><label class="lab">Tipo 1</label><select id="f-t1"></select></div>
+        <div class="f grow"><label class="lab">Tipo 2 (opc.)</label><select id="f-t2"></select></div>
+      </div>
+      <div class="row">
+        <div class="f grow"><label class="lab">Habilidades (coma)</label><input id="f-abil" placeholder="levitate, blaze"></div>
+        <div class="f"><label class="lab">Grupo de XP</label><select id="f-xp">
+          <option value="medium_fast">medium_fast</option><option value="medium_slow">medium_slow</option>
+          <option value="fast">fast</option><option value="slow">slow</option>
+          <option value="erratic">erratic</option><option value="fluctuating">fluctuating</option></select></div>
+      </div>
+      <div class="card" data-cat="pokemon">
+        <label class="lab mb-2">Estadísticas base</label>
+        <div class="statgrid mb-2">
+          <div class="f"><label class="lab">HP</label><input id="st-hp" type="number" value="70"></div>
+          <div class="f"><label class="lab">Ataque</label><input id="st-attack" type="number" value="80"></div>
+          <div class="f"><label class="lab">Defensa</label><input id="st-defence" type="number" value="70"></div>
+          <div class="f"><label class="lab">At. Esp.</label><input id="st-special_attack" type="number" value="90"></div>
+          <div class="f"><label class="lab">Def. Esp.</label><input id="st-special_defence" type="number" value="75"></div>
+          <div class="f"><label class="lab">Velocidad</label><input id="st-speed" type="number" value="85"></div>
+        </div>
+        <div class="statbar"><span class="bar"><i id="bstbar"></i></span></div>
+        <p class="hint" id="bst">Total base: —</p>
+      </div>
+      <div class="row">
+        <div class="f grow"><label class="lab">Catch rate</label><input id="f-catch" type="number" value="45"></div>
+        <div class="f grow"><label class="lab">XP yield</label><input id="f-xpy" type="number" value="160"></div>
+        <div class="f grow"><label class="lab">Grupos huevo</label><input id="f-egg" placeholder="dragon"></div>
+        <div class="f grow"><label class="lab">Escala</label><input id="f-scale" type="number" step="0.05" value="1.0"></div>
+      </div>
+      <div class="f"><label class="lab">Descripción Pokédex</label><textarea id="f-desc" placeholder="Un dragón forjado en lava…"></textarea></div>
+    </div>
+    <!-- PASO 3: MUNDO -->
+    <div class="stepwrap" id="s2">
+      <h2>3 · Movimientos y aparición</h2>
+      <p class="hint">Cómo aprende ataques y dónde aparece en el mundo.</p>
+      <div class="f mb-3"><label class="lab">Movimientos (uno por línea: <code>1:ember</code>, <code>tm:flamethrower</code>, <code>egg:wish</code>)</label>
+        <textarea id="f-moves" style="min-height:90px">1:tackle
+1:growl
+tm:flamethrower</textarea></div>
+      <label class="chk mb-3"><input type="checkbox" id="f-spawn-on" checked> Aparece de forma natural en el mundo</label>
+      <fieldset id="spawnbox" style="border:0;padding:0;margin:0">
+        <div class="f mb-3"><label class="lab">Biomas (coma — admite tags <code>#cobblemon:is_volcanic</code>)</label>
+          <input id="f-biomes" placeholder="#cobblemon:is_volcanic, #minecraft:is_mountain"></div>
+        <div class="row">
+          <div class="f grow"><label class="lab">Nivel</label><input id="f-level" value="20-45"></div>
+          <div class="f grow"><label class="lab">Rareza</label><select id="f-bucket">
+            <option value="common">common</option><option value="uncommon">uncommon</option>
+            <option value="rare" selected>rare</option><option value="ultra-rare">ultra-rare</option></select></div>
+          <div class="f grow"><label class="lab">Peso</label><input id="f-weight" value="5"></div>
+        </div>
+      </fieldset>
+    </div>
+    <!-- PASO 4: EXPORTAR -->
+    <div class="stepwrap" id="s3">
+      <h2>4 · Revisar y exportar</h2>
+      <p class="hint">Esto genera un datapack + resource pack listos para Cobblemon 1.7.x.</p>
+      <div class="sumcard" id="summary"></div>
+      <div class="f mb-3"><label class="lab">Nombre del pack</label><input id="f-pack" placeholder="cobblemon_drakomon"></div>
+      <button class="btn-ok wfull" id="genbtn" onclick="doBuild()" style="padding:12px;justify-content:center">Generar pack</button>
+      <div id="okbox"></div>
+      <div id="err"></div>
+    </div>
+    </div></div>
+  </section>
+  <section id="right" class="split-right">
+    <canvas id="c"></canvas>
+    <div class="viewer-toolbar">
+      <button class="small" onclick="toggleAnim()" id="animbtn" title="animación" aria-label="Reproducir/pausar animación">&#9658;</button>
+      <button class="small" id="spinbtn" onclick="spin=!spin;$('spinbtn').classList.toggle('active',spin)" title="girar" aria-label="Girar modelo">Girar</button>
+    </div>
+    <div id="hud" class="hud">arrastra · rueda = zoom</div>
+  </section>
+</main>
+<footer class="topbar" style="position:static;height:auto;padding:var(--s3) var(--s4)">
+  <button id="backbtn" onclick="go(-1)" disabled>Atrás</button>
+  <span class="sp"></span>
+  <span class="hint" id="stepinfo">Paso 1 de 4</span>
+  <span class="sp"></span>
+  <button class="primary" id="nextbtn" onclick="go(1)">Siguiente</button>
+</footer>
+
+<script src="/vendor/three.min.js"></script>
+<script src="/vendor/OrbitControls.js"></script>
+<script src="/geo-three-reference.js"></script>
+<script src="/anim-bedrock.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+function toggleSide(){ const s = $('appside'); if (!s) return; s.classList.toggle('collapsed'); try{ localStorage.setItem('gd_side', s.classList.contains('collapsed') ? '1' : '0'); }catch(e){} }
+try{ if (localStorage.getItem('gd_side') === '1') $('appside').classList.add('collapsed'); }catch(e){}
+// proyecto abierto (lo fija el launcher de index.html): el Pokémon se añade DENTRO de él
+const PROJECT = (() => { try { return JSON.parse(localStorage.getItem('cs_current') || 'null'); } catch (e) { return null; } })();
+function splitPath(p){ const s=String(p).replace(/[\\/]+$/,''); const i=Math.max(s.lastIndexOf('\\'), s.lastIndexOf('/')); return { parent:s.slice(0,i), base:s.slice(i+1) }; }
+const TYPES = ['normal','fire','water','grass','electric','ice','fighting','poison','ground','flying','psychic','bug','rock','ghost','dragon','dark','steel','fairy'];
+let step = 0, spin = true, animOn = true;
+const data = { model: null };          // model: {source, geoRel} | {source:'upload', geoText, textureB64, shinyB64, animText}
+let cur = { geo: null, texture: null, animation: null };  // para preview
+let allModels = [];
+
+// ---- preview 3D ----
+let scene, camera, renderer, controls, current, clip = null, animStart = 0;
+const canvas = $('c');
+scene = new THREE.Scene(); scene.background = new THREE.Color('#15110d');
+camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000); camera.position.set(0, 20, 60);
+renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+controls = new THREE.OrbitControls(camera, canvas); controls.enableDamping = true;
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const dl = new THREE.DirectionalLight(0xffffff, 0.85); dl.position.set(40, 80, 50); scene.add(dl);
+scene.add(new THREE.GridHelper(64, 16, 0x3a3026, 0x2f261d));
+function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (canvas.width !== w || canvas.height !== h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); } }
+function loop() { requestAnimationFrame(loop); resize(); if (current) { if (animOn && clip) window.applyAnimClip(current, clip, (performance.now() - animStart) / 1000); if (spin) current.rotation.y += 0.01; } controls.update(); renderer.render(scene, camera); }
+loop();
+function frameModel(o) { const b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3()); o.position.sub(c); o.position.y += s.y / 2; const r = Math.max(s.x, s.y, s.z) || 16; camera.position.set(r * 1.25, s.y * 0.65 + r * 0.45, -r * 1.7); controls.target.set(0, s.y * 0.45, 0); controls.update(); }
+const loadTex = url => new Promise((res) => { if (!url) return res(null); new THREE.TextureLoader().load(url, t => res(t), undefined, () => res(null)); });
+async function renderModel() {
+  if (!cur.geo) { if (current) { scene.remove(current); current = null; } $('hud').textContent = 'elige o sube un modelo'; return; }
+  const tex = await loadTex(cur.texture);
+  if (current) scene.remove(current);
+  try { current = window.geoToThreeGroup(cur.geo, tex); clip = cur.animation ? window.buildAnimClip(cur.animation) : null; animStart = performance.now(); scene.add(current); frameModel(current); $('hud').textContent = (data.name || 'modelo') + (clip ? ' · ▶ idle' : ''); }
+  catch (e) { $('hud').textContent = 'error: ' + e.message; }
+}
+function toggleAnim() { animOn = !animOn; $('animbtn').textContent = animOn ? '▶' : '⏸'; if (!animOn && current) window.resetToRest(current); }
+
+// ---- paso 1: modelo ----
+function setTab(t) {
+  $('tab-reuse').classList.toggle('on', t === 'reuse'); $('tab-upload').classList.toggle('on', t === 'upload');
+  $('pane-reuse').style.display = t === 'reuse' ? '' : 'none'; $('pane-upload').style.display = t === 'upload' ? '' : 'none';
+}
+async function loadModels() {
+  const r = await fetch('/api/preview/models').then(r => r.json()).catch(() => ({ models: [] }));
+  allModels = r.models || []; renderModels(allModels);
+}
+function renderModels(ms) {
+  const el = $('mlist'); if (!ms.length) { el.innerHTML = '<div class="mrow full">sin resultados</div>'; return; }
+  el.innerHTML = '';
+  for (const m of ms.slice(0, 1000)) {
+    const d = document.createElement('div'); d.className = 'mrow'; d.title = m.name;
+    d.innerHTML = '<span>' + m.name.replace(/_/g, ' ') + '</span>' + (m.gen ? '<span class="tag">' + m.gen + '</span>' : '');
+    d.onclick = () => { document.querySelectorAll('#mlist .mrow.active').forEach(x => x.classList.remove('active')); d.classList.add('active'); pickReuse(m); };
+    el.appendChild(d);
+  }
+}
+function filterModels() { const q = $('msearch').value.toLowerCase(); renderModels(allModels.filter(m => m.name.toLowerCase().includes(q))); }
+async function pickReuse(m) {
+  data.model = { source: 'reuse', geoRel: m.geo };
+  const r = await fetch('/api/preview/model?geo=' + encodeURIComponent(m.geo)).then(r => r.json());
+  if (r.error) { $('hud').textContent = r.error; return; }
+  cur = { geo: r.geo, texture: r.texture, animation: r.animation };
+  if (!$('f-name').value) { $('f-name').value = cap(m.name); syncName(); }
+  renderModel();
+}
+function upGeo(f) { if (!f) return; const r = new FileReader(); r.onload = () => { try { const g = JSON.parse(r.result); data.model = Object.assign({ source: 'upload' }, data.model && data.model.source === 'upload' ? data.model : {}, { source: 'upload', geoText: r.result }); cur.geo = g; renderModel(); upInfo(); } catch (e) { alert('geo.json inválido'); } }; r.readAsText(f); }
+function upTex(f, which) { if (!f) return; const r = new FileReader(); r.onload = () => { ensureUp(); if (which === 'tex') { data.model.textureB64 = r.result; cur.texture = r.result; } else { data.model.shinyB64 = r.result; } renderModel(); upInfo(); }; r.readAsDataURL(f); }
+function upAnim(f) { if (!f) return; const r = new FileReader(); r.onload = () => { ensureUp(); data.model.animText = r.result; try { cur.animation = JSON.parse(r.result); } catch (e) {} renderModel(); upInfo(); }; r.readAsText(f); }
+function ensureUp() { if (!data.model || data.model.source !== 'upload') data.model = { source: 'upload' }; }
+function upInfo() { const m = data.model || {}; $('upinfo').textContent = '✓ ' + [m.geoText ? 'modelo' : null, m.textureB64 ? 'textura' : null, m.shinyB64 ? 'shiny' : null, m.animText ? 'animación' : null].filter(Boolean).join(' · ') || 'Sin archivos.'; }
+
+// ---- helpers ----
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+function syncName() { data.name = $('f-name').value.trim(); if (current) $('hud').textContent = data.name + (clip ? ' · ▶ idle' : ''); }
+function fillTypes() { $('f-t1').innerHTML = TYPES.map(t => '<option>' + t + '</option>').join(''); $('f-t2').innerHTML = '<option value="">—</option>' + TYPES.map(t => '<option>' + t + '</option>').join(''); $('f-t1').value = 'dragon'; }
+function bst() { const t = ['hp','attack','defence','special_attack','special_defence','speed'].reduce((a, k) => a + (+$('st-' + k).value || 0), 0); $('bst').textContent = 'Total base: ' + t; const b = $('bstbar'); if (b) b.style.width = Math.max(0, Math.min(100, t / 720 * 100)) + '%'; }
+['hp','attack','defence','special_attack','special_defence','speed'].forEach(k => addEventListener('input', e => { if (e.target.id === 'st-' + k) bst(); }));
+$('f-spawn-on').addEventListener('change', () => $('spawnbox').style.opacity = $('f-spawn-on').checked ? 1 : .4);
+
+// ---- navegación ----
+function setStep(n) {
+  step = Math.max(0, Math.min(3, n));
+  for (let i = 0; i < 4; i++) { $('s' + i).classList.toggle('on', i === step); const p = $('p' + i); p.classList.toggle('on', i === step); p.classList.toggle('done', i < step); }
+  $('backbtn').disabled = step === 0;
+  $('nextbtn').style.display = step === 3 ? 'none' : '';
+  $('stepinfo').textContent = 'Paso ' + (step + 1) + ' de 4';
+  if (step === 3) buildSummary();
+}
+function go(d) {
+  if (d > 0) { const e = validate(); if (e) { alert(e); return; } }
+  setStep(step + d);
+}
+function validate() {
+  if (step === 0 && !data.model) return 'Elige o sube un modelo primero.';
+  if (step === 1 && !$('f-name').value.trim()) return 'Ponle un nombre al Pokémon.';
+  return null;
+}
+function collect() {
+  const moves = $('f-moves').value.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const abil = $('f-abil').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const egg = $('f-egg').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const stats = {}; ['hp','attack','defence','special_attack','special_defence','speed'].forEach(k => stats[k] = +$('st-' + k).value || 0);
+  const body = {
+    packName: $('f-pack').value.trim() || ('cobblemon_' + ($('f-name').value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '') || 'pokemon')),
+    species: {
+      name: $('f-name').value.trim(), dexNumber: +$('f-dex').value || 0,
+      primaryType: $('f-t1').value, secondaryType: $('f-t2').value || null,
+      abilities: abil, baseStats: stats, catchRate: +$('f-catch').value || 45,
+      baseExperienceYield: +$('f-xpy').value || 160, experienceGroup: $('f-xp').value,
+      eggGroups: egg, baseScale: +$('f-scale').value || 1, moves, desc: $('f-desc').value.trim(),
+    },
+    model: data.model,
+  };
+  if (PROJECT && PROJECT.root) { const sp = splitPath(PROJECT.root); body.outDir = sp.parent; body.packName = sp.base; }  // escribir DENTRO del pack abierto
+  if ($('f-spawn-on').checked) {
+    const biomes = $('f-biomes').value.split(',').map(s => s.trim()).filter(Boolean);
+    body.spawn = { enabled: true, biomes, level: $('f-level').value.trim() || '5-30', bucket: $('f-bucket').value, weight: $('f-weight').value.trim() || '5' };
+  }
+  return body;
+}
+function buildSummary() {
+  const b = collect();
+  if (!$('f-pack').value) $('f-pack').value = b.packName;
+  const s = b.species;
+  const kv = (k, v) => '<div class="kv"><span>' + k + '</span><b>' + v + '</b></div>';
+  $('summary').innerHTML =
+    kv('Nombre', s.name + ' (#' + s.dexNumber + ')') +
+    kv('Tipo', s.primaryType + (s.secondaryType ? ' / ' + s.secondaryType : '')) +
+    kv('Stats', Object.values(s.baseStats).join('/') + ' = ' + Object.values(s.baseStats).reduce((a, c) => a + c, 0)) +
+    kv('Habilidades', s.abilities.join(', ') || '—') +
+    kv('Movimientos', s.moves.length + ' definidos') +
+    kv('Modelo', b.model && b.model.source === 'reuse' ? 'reutiliza ' + b.model.geoRel.split('/').pop().replace('.geo.json', '') : 'subido por ti') +
+    kv('Aparición', b.spawn ? (b.spawn.bucket + ' · nv ' + b.spawn.level + (b.spawn.biomes.length ? ' · ' + b.spawn.biomes.length + ' biomas' : '')) : 'no aparece (solo comando/huevo)');
+}
+async function doBuild() {
+  $('err').textContent = ''; $('okbox').style.display = 'none';
+  const btn = $('genbtn'); btn.disabled = true; btn.textContent = 'Generando…';
+  try {
+    const r = await fetch('/api/creator/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(collect()) }).then(r => r.json());
+    if (r.error) throw new Error(r.error);
+    const zips = (r.zips || []).map(z => '<div class="kv"><span>' + z.kind + '</span><b>' + z.sizeKB + ' KB · ' + z.files + ' archivos</b></div>').join('');
+    $('okbox').innerHTML = '<b style="color:var(--ok)">✓ ¡Pokémon creado!</b><div style="margin:8px 0">' + zips + '</div>' +
+      '<div class="hint" style="margin-bottom:8px">Carpeta: <code>' + r.root + '</code></div>' +
+      '<button class="btn" onclick="openFolder(\'' + r.root.replace(/\\/g, '\\\\') + '\')">📂 Abrir carpeta</button>' +
+      '<p class="hint" style="margin-top:10px">Mete el <b>_datapack.zip</b> en la carpeta <code>datapacks</code> del mundo y el <b>_resourcepack.zip</b> en <code>resourcepacks</code> (o ambos donde cargues packs de Cobblemon). Pruébalo en juego con <code>/pokespawn ' + r.species + '</code>.</p>';
+    $('okbox').style.display = 'block';
+    btn.textContent = '✓ Generado';
+  } catch (e) { $('err').textContent = '✖ ' + e.message; btn.textContent = 'Generar pack'; }
+  finally { btn.disabled = false; }
+}
+function openFolder(p) { fetch('/api/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: p }) }); }
+
+// init
+fillTypes(); bst(); loadModels(); setStep(0); renderModel();
+(function initProject(){
+  const el = $('creatorProj');
+  if (PROJECT && PROJECT.root) {
+    el.querySelector('span:last-child').textContent = PROJECT.name || 'pack abierto';
+    el.title = 'El Pokémon se añadirá a tu pack: ' + PROJECT.root;
+    const pf = $('f-pack'); if (pf) { pf.value = splitPath(PROJECT.root).base; pf.disabled = true; if (pf.previousElementSibling) pf.previousElementSibling.textContent = 'Se añade a tu pack abierto'; }
+  } else {
+    el.className = 'status-badge off'; el.querySelector('span:last-child').textContent = 'sin pack abierto';
+  }
+})();
+$('spinbtn').classList.toggle('active', spin);
+</script>
+</body></html>
