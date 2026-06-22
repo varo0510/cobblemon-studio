@@ -1,0 +1,242 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cobblemon Studio — Doctor del pack</title>
+<link rel="stylesheet" href="/studio.css">
+<script>(function(){ if(new URLSearchParams(location.search).get('embed')==='1') document.documentElement.classList.add('embed'); })();</script>
+<script src="/tauri-shim.js"></script>
+<script src="/ctxmenu.js"></script>
+<style>
+  .dc{height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+  .dc-top{flex:0 0 auto;padding:16px 22px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .dc-top h1{margin:0 0 3px;font-size:20px}
+  .dc-top .sub{color:var(--dim);font-size:13px;margin:0}
+  .dc-body{flex:1;min-height:0;overflow-y:auto;padding:16px 22px 50px}
+  /* tarjeta de salud */
+  .health{display:flex;align-items:center;gap:18px;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:18px}
+  .health .dot{flex:0 0 auto;width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px}
+  .health.ok .dot{background:color-mix(in srgb,#46b96a 22%,transparent)}
+  .health.warn .dot{background:color-mix(in srgb,#e3a93a 22%,transparent)}
+  .health.err .dot{background:color-mix(in srgb,var(--err) 20%,transparent)}
+  .health .info{flex:1;min-width:0}
+  .health .info h2{margin:0 0 3px;font-size:18px}
+  .health .info .counts{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-top:4px}
+  .health .info .counts b{font-variant-numeric:tabular-nums}
+  .c-err{color:var(--err)} .c-warn{color:#e3a93a} .c-info{color:#5aa9e6}
+  .health .acts{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;align-items:stretch}
+  .health .acts .btn{justify-content:center;white-space:nowrap}
+  .score{font-variant-numeric:tabular-nums;font-weight:700}
+  /* grupos */
+  .grp{margin-bottom:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden}
+  .grp-h{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none;font-weight:650;font-size:14px}
+  .grp-h:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  .grp-h .ic{font-size:17px}
+  .grp-h .pill{margin-left:auto;display:flex;gap:6px;font-size:11px;font-weight:700}
+  .grp-h .pill span{padding:1px 8px;border-radius:20px}
+  .pe{background:color-mix(in srgb,var(--err) 18%,transparent);color:var(--err)}
+  .pw{background:color-mix(in srgb,#e3a93a 18%,transparent);color:#e3a93a}
+  .pi{background:color-mix(in srgb,#5aa9e6 18%,transparent);color:#5aa9e6}
+  .grp-h .chev{transition:transform .18s;opacity:.5}
+  .grp.collapsed .chev{transform:rotate(-90deg)}
+  .grp.collapsed .grp-b{display:none}
+  .grp-b{padding:4px 12px 12px}
+  /* fila de problema */
+  .find{display:flex;align-items:flex-start;gap:10px;padding:10px 8px;border-top:1px solid var(--line)}
+  .find:first-child{border-top:none}
+  .find .sev{flex:0 0 auto;font-size:15px;line-height:1.4}
+  .find .mid{flex:1;min-width:0}
+  .find .ti{font-size:13.5px;font-weight:600}
+  .find .ms{font-size:12.5px;color:var(--dim);margin-top:2px}
+  .find .fl{font-size:11px;color:var(--faint);font-family:var(--font-mono);margin-top:3px;cursor:pointer;word-break:break-all}
+  .find .fl:hover{color:var(--accent)}
+  .find .sugg{font-size:11.5px;color:#5aa9e6;margin-top:3px}
+  .find .side{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+  .chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
+  .chip.auto{background:color-mix(in srgb,#46b96a 18%,transparent);color:#46b96a}
+  .chip.confirmar{background:color-mix(in srgb,#e3a93a 18%,transparent);color:#e3a93a}
+  .chip.manual{background:var(--panel);color:var(--faint);border:1px solid var(--line)}
+  .dc-empty{text-align:center;color:var(--dim);margin-top:50px}
+  .dc-load{display:flex;align-items:center;gap:10px;color:var(--dim);justify-content:center;margin-top:60px}
+  /* modal */
+  .ov{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:6vh 18px;overflow:auto}
+  .ov.open{display:flex}
+  .panel{width:100%;max-width:640px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 18px 54px rgba(0,0,0,.5);overflow:hidden}
+  .panel .h{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid var(--line)}
+  .panel .h h2{margin:0;font-size:16px}.panel .h .x{margin-left:auto;cursor:pointer;color:var(--faint)}
+  .panel .b{padding:14px 18px;max-height:64vh;overflow:auto}
+  .panel .f{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+  .diff{margin:8px 0}
+  .diff .lab{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+  .diff pre{margin:0 0 8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:11.5px;font-family:var(--font-mono);white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto}
+  .diff pre.after{border-color:color-mix(in srgb,#46b96a 45%,var(--line))}
+  .bkrow{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);margin-bottom:6px}
+  .bkrow .nm{flex:1;font-size:12.5px}
+  .note{background:color-mix(in srgb,#5aa9e6 12%,transparent);border:1px solid color-mix(in srgb,#5aa9e6 35%,var(--line));border-radius:8px;padding:8px 11px;font-size:12px;margin:10px 0}
+  .fixlist{margin:6px 0}
+  .fixlist label{display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:12.5px;border-top:1px solid var(--line)}
+  .fixlist label:first-child{border-top:none}
+  .fixlist .fx-lab{flex:1}.fixlist .fx-file{font-size:10.5px;color:var(--faint);font-family:var(--font-mono)}
+</style></head>
+<body>
+<div class="dc">
+  <div class="dc-top">
+    <h1>🩺 Doctor del pack</h1>
+    <p class="sub">Reviso tu pack de arriba a abajo y te digo si está bien hecho. Los arreglos seguros los puedo hacer yo (siempre con copia de seguridad).</p>
+  </div>
+  <div class="dc-body" id="body"><div class="dc-load"><span class="spinner"></span>Revisando tu pack…</div></div>
+</div>
+
+<div class="ov" id="prevOv"><div class="panel">
+  <div class="h"><span id="prevIc">🛠️</span><h2 id="prevTitle">Arreglar</h2><span class="x" onclick="closePrev()">✕</span></div>
+  <div class="b" id="prevBody"></div>
+  <div class="f"><button class="btn small" onclick="closePrev()">Cancelar</button><button class="btn small primary" id="prevApply">Aplicar</button></div>
+</div></div>
+
+<div class="ov" id="bkOv"><div class="panel">
+  <div class="h"><span>↩️</span><h2>Deshacer cambios</h2><span class="x" onclick="$('bkOv').classList.remove('open')">✕</span></div>
+  <div class="b" id="bkBody"></div>
+</div></div>
+
+<div id="toaster"></div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const PROJECT=(()=>{ try{ return JSON.parse(localStorage.getItem('cs_current')||'null'); }catch(e){ return null; } })();
+async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg,type){ const h=$('toaster'); if(!h)return; const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg; h.appendChild(t); const c=()=>{ if(!t.parentNode)return; t.classList.add('out'); setTimeout(()=>t.parentNode&&t.parentNode.removeChild(t),300); }; const tm=setTimeout(c,3800); t.onclick=()=>{clearTimeout(tm);c();}; }
+
+const CATS={ estructura:['🧱','Estructura del pack'], json:['⚠️','Archivos rotos'], nombres:['🔤','Nombres e identificadores'], datapack:['🐲','Pokémon y datos'], referencias:['🔗','Conexiones rotas'], resource:['🎨','Modelos y texturas'], lang:['💬','Textos del juego'], huerfanos:['🧹','Archivos que sobran'], otros:['📦','Otros'] };
+const CATORDER=['estructura','json','nombres','referencias','datapack','resource','lang','huerfanos','otros'];
+const SEV={ error:'⛔', warn:'⚠️', info:'ℹ️' };
+const SAFE={ auto:['auto','Automático'], confirmar:['confirmar','Necesita tu OK'], manual:['manual','Hazlo tú'] };
+let DATA=null;
+
+async function scan(){
+  const body=$('body');
+  if(!PROJECT||!PROJECT.root){ body.innerHTML='<div class="dc-empty">No hay ningún pack abierto.<br>Abre o crea un pack desde el Inicio.</div>'; return; }
+  body.innerHTML='<div class="dc-load"><span class="spinner"></span>Revisando tu pack…</div>';
+  let r; try{ r=await csInvoke('pack_doctor',{path:PROJECT.root}); }catch(e){ body.innerHTML='<div class="dc-empty">No se pudo revisar el pack.<br><span class="sub">'+esc(e&&e.message||e)+'</span></div>'; return; }
+  if(!r||!r.exists){ body.innerHTML='<div class="dc-empty">No encontré el pack en disco.</div>'; return; }
+  DATA=r; render();
+}
+
+function render(){
+  const r=DATA, h=r.health||{error:0,warn:0,info:0,fixableAuto:0,fixableConfirm:0,score:100,label:'saludable'};
+  const cls=h.error>0?'err':(h.warn>0?'warn':'ok');
+  const face=h.error>0?'🩹':(h.warn>0?'🟡':'✅');
+  const titleTxt=h.error>0?'Tu pack tiene errores que hay que arreglar':(h.warn>0?'Tu pack tiene avisos':'Tu pack está saludable');
+  let html='';
+  html+='<div class="health '+cls+'"><div class="dot">'+face+'</div><div class="info"><h2>'+titleTxt+'</h2>'+
+    '<div class="counts"><span class="score">Salud: '+h.score+'/100</span>'+
+    '<span class="c-err">⛔ '+h.error+' errores</span><span class="c-warn">⚠️ '+h.warn+' avisos</span><span class="c-info">ℹ️ '+h.info+' sugerencias</span></div>'+
+    (h.fixableAuto?('<div class="counts"><span style="color:#46b96a">🛠️ Puedo arreglar '+h.fixableAuto+' problema'+(h.fixableAuto>1?'s':'')+' de forma segura.</span></div>'):'')+
+    '</div><div class="acts">'+
+    (h.fixableAuto?'<button class="btn small primary" onclick="fixAllSafe()">🛠️ Arreglar todo lo seguro</button>':'')+
+    '<button class="btn small" onclick="scan()">↻ Volver a revisar</button>'+
+    '<button class="btn small" onclick="openBackups()">↩️ Deshacer cambios</button>'+
+    '</div></div>';
+
+  const finds=r.findings||[];
+  if(!finds.length){ html+='<div class="dc-empty">🎉 Todo en orden. No hay nada que arreglar.</div>'; $('body').innerHTML=html; return; }
+
+  // agrupar por categoría
+  const byCat={};
+  finds.forEach((f,i)=>{ f._i=i; const c=CATS[f.category]?f.category:'otros'; (byCat[c]=byCat[c]||[]).push(f); });
+  const cats=CATORDER.filter(c=>byCat[c]);
+  cats.forEach(c=>{
+    const arr=byCat[c]; const cm=CATS[c];
+    const e=arr.filter(x=>x.level==='error').length, w=arr.filter(x=>x.level==='warn').length, ii=arr.filter(x=>x.level==='info').length;
+    const collapsed=e===0;   // abre por defecto los grupos con errores
+    html+='<div class="grp'+(collapsed?' collapsed':'')+'"><div class="grp-h" onclick="this.parentElement.classList.toggle(\'collapsed\')"><span class="ic">'+cm[0]+'</span>'+esc(cm[1])+
+      '<span class="pill">'+(e?'<span class="pe">'+e+'</span>':'')+(w?'<span class="pw">'+w+'</span>':'')+(ii?'<span class="pi">'+ii+'</span>':'')+'</span>'+
+      '<span class="chev" style="margin-left:8px">▾</span></div><div class="grp-b">';
+    // ordenar: error, warn, info
+    arr.sort((a,b)=>({error:0,warn:1,info:2}[a.level]-{error:0,warn:1,info:2}[b.level]));
+    arr.forEach(f=>{
+      const sf=SAFE[f.safety]||SAFE.manual;
+      html+='<div class="find"><div class="sev">'+(SEV[f.level]||'•')+'</div><div class="mid">'+
+        '<div class="ti">'+esc(f.title)+'</div><div class="ms">'+esc(f.msg)+'</div>'+
+        (f.file?'<div class="fl" onclick="openFile(\''+esc(encodeURIComponent(f.file))+'\')">'+esc(f.file)+'</div>':'')+
+        (f.suggestion?'<div class="sugg">💡 '+esc(f.suggestion)+'</div>':'')+
+        '</div><div class="side"><span class="chip '+sf[0]+'">'+sf[1]+'</span>'+
+        (f.fix?'<button class="btn small primary" onclick="openFix('+f._i+')">🛠️ Arreglar</button>':'')+
+        (!f.fix&&f.file?'<button class="btn small" onclick="openFile(\''+esc(encodeURIComponent(f.file))+'\')">Abrir</button>':'')+
+        '</div></div>';
+    });
+    html+='</div></div>';
+  });
+  $('body').innerHTML=html;
+}
+
+function opOf(f){ const x=f.fix; return {id:f.id, kind:x.kind, rel:x.rel||'', from:x.from||'', to:x.to||'', content:x.content||'', key:x.key||'', value:x.value||'', find:x.find||'', replace:x.replace||''}; }
+
+// ---- preview + aplicar un arreglo ----
+function openFix(i){
+  const f=DATA.findings[i]; if(!f||!f.fix) return; const x=f.fix;
+  $('prevTitle').textContent=x.label||'Arreglar';
+  let b='<div style="font-size:13px;margin-bottom:6px">'+esc(f.title)+'</div>';
+  const pv=x.preview||{};
+  if(x.kind==='create'){ b+='<div class="diff"><div class="lab">Se creará este archivo nuevo</div><div class="fl" style="font-family:var(--font-mono);font-size:11px;color:var(--faint)">'+esc(x.rel)+'</div><pre class="after">'+esc(pv.after||x.content||'')+'</pre></div>'; }
+  else if(x.kind==='move'){ b+='<div class="note">Se moverá:<br><b>'+esc(x.from)+'</b><br>→ <b>'+esc(x.to)+'</b></div>'; }
+  else if(x.kind==='delete'){ b+='<div class="note">⚠️ Esto borra archivos. Se guardará una copia de seguridad por si acaso.</div><div class="fl">'+esc(x.rel)+'</div>'; }
+  else { // write
+    if(pv.before!=null && String(pv.before)!=='') b+='<div class="diff"><div class="lab">Antes</div><pre>'+esc(pv.before)+'</pre></div>';
+    b+='<div class="diff"><div class="lab">Después</div><pre class="after">'+esc(pv.after!=null?pv.after:x.content)+'</pre></div>';
+  }
+  b+='<div class="note">Antes de cambiar nada guardaré una copia en la carpeta <b>_backup_doctor</b> de tu pack. Podrás deshacerlo.</div>';
+  $('prevBody').innerHTML=b;
+  $('prevApply').onclick=()=>applyFixes([opOf(f)]);
+  $('prevOv').classList.add('open');
+}
+function closePrev(){ $('prevOv').classList.remove('open'); }
+
+function fixAllSafe(){
+  const autos=(DATA.findings||[]).filter(f=>f.fix&&f.safety==='auto');
+  const confirmables=(DATA.findings||[]).filter(f=>f.fix&&f.safety==='confirmar');
+  if(!autos.length&&!confirmables.length){ toast('No hay arreglos automáticos','info'); return; }
+  $('prevTitle').textContent='Arreglar todo lo seguro';
+  let b='<div class="note">Se aplicarán los arreglos marcados. Antes guardaré una copia de seguridad en <b>_backup_doctor</b>.</div><div class="fixlist">';
+  autos.forEach((f,i)=>{ b+='<label><input type="checkbox" data-i="'+f._i+'" checked><span class="fx-lab">'+esc(f.fix.label||f.title)+'<div class="fx-file">'+esc(f.fix.rel||'')+'</div></span><span class="chip auto">Automático</span></label>'; });
+  confirmables.forEach((f)=>{ b+='<label><input type="checkbox" data-i="'+f._i+'"><span class="fx-lab">'+esc(f.fix.label||f.title)+'<div class="fx-file">'+esc(f.fix.rel||'')+'</div></span><span class="chip confirmar">Necesita tu OK</span></label>'; });
+  b+='</div>';
+  $('prevBody').innerHTML=b;
+  $('prevApply').onclick=()=>{ const ops=[...$('prevBody').querySelectorAll('input[type=checkbox]:checked')].map(c=>opOf(DATA.findings[+c.dataset.i])); if(!ops.length){ toast('No has marcado nada','info'); return; } applyFixes(ops); };
+  $('prevOv').classList.add('open');
+}
+
+async function applyFixes(ops){
+  $('prevApply').disabled=true;
+  let r; try{ r=await csInvoke('doctor_apply_fixes',{path:PROJECT.root,fixes:ops}); }catch(e){ r={ok:false,error:(e&&e.message)||e}; }
+  $('prevApply').disabled=false; closePrev();
+  if(!r){ toast('No se pudo aplicar','err'); return; }
+  if(r.error){ toast('No se pudo aplicar: '+esc(r.error),'err'); return; }
+  const nf=(r.failed&&r.failed.length)||0;
+  if(nf) toast('Apliqué '+r.applied+', fallaron '+nf+'. Copia en '+r.backupDir,'err');
+  else toast('✅ Listo ('+r.applied+'). Copia en '+r.backupDir,'ok');
+  noteDirtyParent();
+  scan();
+}
+
+// ---- deshacer ----
+async function openBackups(){
+  let r; try{ r=await csInvoke('doctor_list_backups',{path:PROJECT.root}); }catch(e){ r={backups:[]}; }
+  const bks=(r&&r.backups)||[];
+  let b=bks.length?'':'<div class="dc-empty" style="margin:10px 0">No hay copias de seguridad todavía.</div>';
+  bks.forEach(bk=>{ const d=new Date(parseInt(bk.timestamp,10)*1000); const when=isNaN(d.getTime())?bk.timestamp:d.toLocaleString();
+    b+='<div class="bkrow"><span class="nm"><b>'+esc(when)+'</b><br><span class="sub" style="font-size:11px">'+bk.count+' arreglo(s)</span></span><button class="btn small" onclick="restore(\''+esc(bk.timestamp)+'\')">↩️ Restaurar</button></div>'; });
+  $('bkBody').innerHTML=b;
+  $('bkOv').classList.add('open');
+}
+async function restore(ts){
+  if(!confirm('¿Restaurar esta copia? Devolverá tu pack al estado anterior a esos arreglos.')) return;
+  let r; try{ r=await csInvoke('doctor_restore_backup',{path:PROJECT.root,timestamp:ts}); }catch(e){ r={ok:false,error:(e&&e.message)||e}; }
+  if(!r||!r.ok){ toast('No se pudo restaurar: '+esc(r&&r.error||'error'),'err'); return; }
+  $('bkOv').classList.remove('open'); toast('↩️ Restaurado ('+r.restored+')','ok'); noteDirtyParent(); scan();
+}
+
+function openFile(enc){ const rel=decodeURIComponent(enc); try{ if(window.parent&&window.parent.csEditFiles) { window.parent.csEditFiles([rel]); return; } }catch(e){} toast('Archivo: '+rel,'info'); }
+function noteDirtyParent(){ try{ if(window.parent&&window.parent.refreshPackInfo) window.parent.refreshPackInfo(); }catch(e){} }
+
+scan();
+</script>
+</body></html>

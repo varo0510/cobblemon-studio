@@ -118,7 +118,7 @@ async function scan(){
     const readJ=async rel=>{ try{ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel}); return r&&r.text?JSON.parse(r.text):null; }catch(e){ console.warn('JSON inválido en',rel,e); return null; } };
     // mapa de textos (lang) fusionado: para recuperar título/descr de marcas, etc.
     const langMap={}; for(const f of (rs.lang||[])){ const j=await readJ(f.rel); if(j&&typeof j==='object') for(const k in j){ if(!(k in langMap)) langMap[k]=j[k]; } }
-    const resolverFolder=rel=>{ const a=rel.split('/resolvers/')[1]; if(!a) return ''; const parts=a.split('/'); parts.pop(); return parts.join('/'); };
+    const resolverFolder=rel=>{ const a=(rel.split('/resolvers/')[1]||rel.split('/species/')[1]); if(!a) return ''; const parts=a.split('/'); parts.pop(); return parts.join('/'); };
 
     // --- precarga de resolvers (para recuperar carpeta/textura de formas y reskins) ---
     const resolvers=[];

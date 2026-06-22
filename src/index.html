@@ -489,9 +489,8 @@
     <div class="snav-items">
       <a class="snav-item" data-nav="estado" onclick="navPack()">Contenido del pack</a>
       <a class="snav-item" data-nav="editpack" onclick="navEditPack()">✏️ Editar mi pack</a>
+      <a class="snav-item" data-nav="doctor" onclick="navDoctor()">🩺 Doctor del pack</a>
       <a class="snav-item" data-nav="exportar" onclick="navExport()">Exportar .zip</a>
-      <a class="snav-item" onclick="saveProjectFile()">Guardar proyecto</a>
-      <a class="snav-item" onclick="$('projFile').click()">Cargar proyecto</a>
     </div>
   </div>
 
@@ -645,11 +644,9 @@
       </ul>
     </div></details>
 
-    <details class="gsec"><summary>💾 Guardar y cargar tu proyecto</summary><div class="gbody">
+    <details class="gsec"><summary>💾 Autoguardado</summary><div class="gbody">
       <ul>
-        <li><b>💾 Guardar proyecto:</b> baja un <code>.json</code> con todos los bloques del editor para retomarlos otro día.</li>
-        <li><b>📂 Cargar proyecto:</b> vuelve a montar esos bloques.</li>
-        <li><b>Autoguardado:</b> si cierras y vuelves, te ofrece <b>“Retomar”</b> el último proyecto.</li>
+        <li><b>Autoguardado:</b> si cierras y vuelves, te ofrece <b>“Retomar”</b> lo último que estabas montando en el editor.</li>
       </ul>
       <p class="gnote">Esto guarda <b>el formulario</b> (lo que estás montando), no los archivos generados. Para los archivos, usa Generar/Empaquetar.</p>
     </div></details>
@@ -698,7 +695,7 @@
         <li><b>“Se ve sin textura / como un sustituto”</b> → falta el <code>.png</code> (o el modelo). Mira el checklist en Explorar pack y ponlo en la ruta indicada.</li>
         <li><b>“No se ven los cambios visuales”</b> → activa el resource pack en Opciones y pulsa <b>F3 + T</b> (o reentra al mundo).</li>
         <li><b>“Un campo está en rojo”</b> → es obligatorio y está vacío. En ámbar = el id no lo reconozco (puede ser de otro mod o una errata).</li>
-        <li><b>“No quiero perder lo que llevo”</b> → 💾 Guardar proyecto (o se autoguarda y te ofrece Retomar).</li>
+        <li><b>“No quiero perder lo que llevo”</b> → se autoguarda solo y al volver te ofrece <b>Retomar</b>.</li>
         <li><b>“La ventana negra del servidor se cierra”</b> → es el motor; déjala abierta. Si no abre el navegador, ahí sale la dirección <code>http://localhost:…</code>.</li>
       </ul>
     </div></details>
@@ -878,9 +875,6 @@
   <button id="btnZip" class="hide" onclick="zipPack()">Empaquetar .zip</button>
   <span class="sp"></span>
   <label class="chk" style="margin:0"><input type="checkbox" id="overwrite"> Sobrescribir si ya existe</label>
-  <button class="small" onclick="saveProjectFile()" title="Guardar los bloques en un archivo .json para retomarlo luego">Guardar proyecto</button>
-  <button class="small" onclick="$('projFile').click()" title="Cargar un proyecto .json guardado">Cargar proyecto</button>
-  <input type="file" id="projFile" accept=".json,application/json" class="hide" onchange="loadProjectFile(this)">
   <button class="small del" onclick="clearAll()" title="Quitar todos los bloques">Vaciar</button>
 </div>
 </div><!-- /appmain --></div><!-- /app-shell -->
@@ -1277,18 +1271,6 @@ function restoreCards(arr){
     dst.forEach(el=>{ try{ el.dispatchEvent(new Event(el.tagName==='SELECT'||el.type==='checkbox'?'change':'input',{bubbles:true})); }catch(e){} });
   });
   if(!$('cards').querySelector('.card')) $('cards').innerHTML='<p class="muted" id="empty">Añade uno o varios bloques con los botones de arriba.</p>';
-}
-function saveProjectFile(){
-  const data=serializeCards(); if(!data.length){ alert('No hay bloques que guardar.'); return; }
-  try{ localStorage.setItem('gd_project',JSON.stringify(data)); }catch(e){}
-  const blob=new Blob([JSON.stringify({_tool:'cobblemon-datapack-gen',version:1,cards:data},null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='proyecto-cobblemon.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-}
-function loadProjectFile(input){
-  const f=input.files&&input.files[0]; if(!f) return; const rd=new FileReader();
-  rd.onload=()=>{ try{ const j=JSON.parse(rd.result); const cards=Array.isArray(j)?j:j.cards; if(!Array.isArray(cards)) throw 0;
-      revealEditor(); restoreCards(cards); autosaveProject(); }catch(e){ alert('Ese archivo no es un proyecto válido.'); } input.value=''; };
-  rd.readAsText(f);
 }
 function restoreSaved(){ try{ const d=JSON.parse(localStorage.getItem('gd_project')||'[]'); revealEditor(); restoreCards(d); }catch(e){} $('resumeBanner').style.display='none'; }
 function dismissResume(){ $('resumeBanner').style.display='none'; try{ localStorage.removeItem('gd_project'); }catch(e){} }
@@ -2258,6 +2240,8 @@ const FRAME_PAGES={
   paintpng:{ url:'/paint.html?embed=1&mode=png', title:'Editor PNG', icon:'🖼️', nav:'paintpng' },
   photo:  { url:'/photo.html?embed=1', title:'Modo foto', icon:'📷', nav:'photo' },
   mypack: { url:'/mypack.html?embed=1', title:'Editar mi pack', icon:'✏️', nav:'editpack' },
+  doctor: { url:'/doctor.html?embed=1', title:'Doctor del pack', icon:'🩺', nav:'doctor' },
+  export: { url:'/export.html?embed=1', title:'Exportar .zip', icon:'⬇️', nav:'exportar' },
 };
 function setFrameMode(on){   // alterna entre el contenido normal (.wrap+.foot) y el host de iframes
   const w=document.querySelector('.appmain>.wrap'), foot=document.querySelector('.appmain>.foot'), fh=$('frameScreen');
@@ -2285,8 +2269,11 @@ function navPaint(){ openFrameTab('paint'); }
 function navPaintPng(){ openFrameTab('paintpng'); }
 function navPhoto(){ openFrameTab('photo'); }
 function navEditPack(){ openFrameTab('mypack'); }
+function navDoctor(){ openFrameTab('doctor'); }
 // ===== Modo edición: editar un caso del pack (lo llama mypack.html) =====
-function csEditFiles(rels){ if(!rels||!rels.length) return; navPack(); setTimeout(()=>{ try{ const rel=rels[0]; const cat=(typeof pkCatOf==='function')?pkCatOf(rel):'datapack'; openTab(encodeURIComponent(rel), cat); }catch(e){} }, 350); }
+function csEditFiles(rels){ if(!rels||!rels.length) return; pkPendingOpen=rels[0]; navPack(); }   // renderPackHome abre el archivo pendiente cuando el DOM está listo (no por timeout)
+function pkCatOfRel(rel){ try{ const g=pkDetail&&pkDetail.groups; if(g) for(const grp in g){ for(const cat in g[grp]){ if((g[grp][cat]||[]).some(it=>it.rel===rel)) return cat; } } }catch(e){}
+  const r=String(rel).toLowerCase(); if(r.endsWith('.geo.json')||r.endsWith('.geo')) return 'models'; if(r.endsWith('.png')) return 'textures'; return 'datapack'; }
 function csEditSet(card, sel, val){ const el=card.querySelector(sel); if(!el) return; if(el.type==='checkbox') el.checked=!!val; else el.value=(val==null?'':String(val)); try{ el.dispatchEvent(new Event(el.tagName==='SELECT'||el.type==='checkbox'?'change':'input',{bubbles:true})); }catch(e){} }
 const CS_EDIT_REVERSE={
   berry:(c,d)=>{ const b=d.berry||{}, fl=b.flavours||{}, y=b.baseYield||{}, g=b.growthTime||{}; csEditSet(c,'.y-name',d.name); csEditSet(c,'.y-colour',(b.colour||'RED')); csEditSet(c,'.y-biomes',(b.preferredBiomeTags||[]).join(', ')); csEditSet(c,'.y-ymin',y.min); csEditSet(c,'.y-ymax',y.max); csEditSet(c,'.y-gmin',g.min); csEditSet(c,'.y-gmax',g.max); csEditSet(c,'.y-spicy',fl.SPICY||0); csEditSet(c,'.y-dry',fl.DRY||0); csEditSet(c,'.y-sweet',fl.SWEET||0); csEditSet(c,'.y-bitter',fl.BITTER||0); csEditSet(c,'.y-sour',fl.SOUR||0); },
@@ -2338,13 +2325,14 @@ async function renderPackHome(){
   const name=($('projName')&&$('projName').textContent)||'pack';
   const d=await apiPost('/api/packdetail',{path:lastRoot}); pkDetail=d;
   let h='<div class="ph-hero"><div class="logo"></div><div><h2>'+esc(name)+'</h2><div class="sub">'+esc(lastRoot||'')+'</div></div><div class="ph-total"><b>'+((d&&d.total)||0)+'</b><span>elementos</span></div></div>';
-  if(!d||!d.exists||!d.total){ h+='<div class="ph-empty"><div class="pokeball-deco" style="width:120px;height:120px;opacity:.13;margin:0 auto 18px"></div>Tu pack está vacío.<br>Usa <b>Crear</b> en el menú para añadir tu primer Pokémon, objeto o aspecto.</div>'; box.innerHTML=h; return; }
+  if(!d||!d.exists||!d.total){ pkPendingOpen=null; h+='<div class="ph-empty"><div class="pokeball-deco" style="width:120px;height:120px;opacity:.13;margin:0 auto 18px"></div>Tu pack está vacío.<br>Usa <b>Crear</b> en el menú para añadir tu primer Pokémon, objeto o aspecto.</div>'; box.innerHTML=h; return; }
   h+='<div class="pk-split"><aside class="pk-tree" id="pkTree"></aside><section class="pk-right"><div class="pk-tabs" id="pkTabs"></div><div class="pk-insp" id="pkInsp"></div></section></div>';
   h+='<div style="margin-top:12px;display:flex;gap:8px"><button class="btn small" onclick="pkVerify()">🔍 Verificar</button><button class="btn small" onclick="apiPost(\'/api/open\',{path:lastRoot})">📂 Abrir carpeta</button><button class="btn small" onclick="navExport()">📦 Exportar .zip</button></div>';
   box.innerHTML=h;
   buildPkTree(d);
   if(!fresh && pkTabs.length){ renderTabs(); if(pkActiveRel) activateTab(encodeURIComponent(pkActiveRel)); else pkOverview(d); }
   else pkOverview(d);
+  if(pkPendingOpen){ const rel=pkPendingOpen; pkPendingOpen=null; openTab(encodeURIComponent(rel), pkCatOfRel(rel)); }   // abre el archivo que pidió el Doctor, ya con el DOM listo
 }
 function buildPkTree(d){
   let h='<input class="pk-search" id="pkSearch" placeholder="🔍 Buscar en el pack…" oninput="pkFilter(this.value)">';
@@ -2360,7 +2348,7 @@ function buildPkTree(d){
   $('pkTree').innerHTML=h;
 }
 function pkFilter(q){ q=(q||'').toLowerCase().trim(); document.querySelectorAll('#pkTree .pk-cat').forEach(cat=>{ let any=false; cat.querySelectorAll('.pk-item').forEach(it=>{ const m=!q||it.textContent.toLowerCase().includes(q); it.style.display=m?'':'none'; if(m)any=true; }); cat.style.display=any?'':'none'; if(q&&any)cat.classList.remove('collapsed'); }); }
-let pkTabs=[], pkActiveRel=null, pkDrafts={}, pkCurEditRel=null;
+let pkTabs=[], pkActiveRel=null, pkDrafts={}, pkCurEditRel=null, pkPendingOpen=null;
 function pkIcon(cat){ return (pkDetail&&pkDetail.labels[cat]&&pkDetail.labels[cat][0])||'📄'; }
 function captureDraft(){ if(pkEditCM&&pkCurEditRel){ try{ pkDrafts[pkCurEditRel]=pkEditCM.getValue(); }catch(e){} } if(pkEditCM){ try{ pkEditCM.toTextArea(); }catch(e){} } pkEditCM=null; pkCurEditRel=null; }
 function openTab(relEnc,cat){ const rel=decodeURIComponent(relEnc); if(!pkTabs.some(t=>t.rel===rel)) pkTabs.push({rel,cat}); activateTab(relEnc); }
@@ -2665,7 +2653,7 @@ async function cosmeticAssets(c){ const target=(v(c,'.wc-target')||'').toLowerCa
   const aspect=window.CSB.slug(v(c,'.wc-aspect'))||('cosmetic_item-'+itemName); const suffix=window.CSB.slug(aspect); const folder=window.CSB.slug(v(c,'.wc-folder'))||sp;
   return writeAspectAssets(c, ns, sp, suffix, folder); }
 function assistDone(r){ const n=(s)=>(r.results||[]).filter(x=>x.status===s).length; const ok=n('written')+n('merged'); $('assistDoneMsg').textContent=ok+' archivo(s) creados/actualizados en tu pack.'; $('assistDone').classList.remove('hide'); }
-function navExport(){ openAppTab('exportar','Exportar .zip','⬇️',()=>{ revealEditor(); setActiveNav('exportar'); const f=document.querySelector('.foot'); if(f) f.scrollIntoView({behavior:'smooth'}); }); }
+function navExport(){ openFrameTab('export'); }
 function navGuide(){ openAppTab('guia','Guía','📖',()=>{ openGuide(); setActiveNav('guia'); }); }
 function toggleSide(){ const s=$('appside'); if(!s) return; s.classList.toggle('collapsed'); try{localStorage.setItem('gd_side', s.classList.contains('collapsed')?'1':'0');}catch(e){} }
 function restoreSidebar(){ try{ const w=localStorage.getItem('cs_side_w'); if(w) document.documentElement.style.setProperty('--side-w', w+'px'); if(localStorage.getItem('gd_side')==='1'){ const s=$('appside'); if(s) s.classList.add('collapsed'); } }catch(e){} }

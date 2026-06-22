@@ -8,6 +8,7 @@
 <script src="/tauri-shim.js"></script>
 <script src="/vendor/three.min.js"></script>
 <script src="/vendor/OrbitControls.js"></script>
+<script src="/vendor/TransformControls.js"></script>
 <script src="/geo-three-reference.js"></script>
 <script src="/anim-bedrock.js"></script>
 <script src="/vendor/gif-encoder.js"></script>
@@ -67,6 +68,18 @@
   #pkList{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:4px;display:grid;grid-template-columns:1fr 1fr;gap:2px;flex:1}
   #pkList .mrow{text-transform:capitalize}
   #pkList .mrow.full{grid-column:1/-1;text-align:center;color:var(--dim)}
+  /* lista de huesos modificados (pose) — filas plegables al estilo de los actores */
+  .bone-list{display:flex;flex-direction:column;gap:4px;margin-top:5px}
+  .bone-item{border:1px solid transparent;border-radius:8px;background:var(--panel2);overflow:hidden}
+  .bone-item.on{border-color:var(--accent)}
+  .bone-head{display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;font-size:12.5px;user-select:none}
+  .bone-head:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .bone-head .chev{width:10px;color:var(--faint);font-size:10px;flex:0 0 auto}
+  .bone-head .bn{flex:1;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bone-head .bv{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .bone-head .bx{color:var(--faint);font-weight:700;flex:0 0 auto;padding:0 2px}
+  .bone-head .bx:hover{color:var(--err)}
+  .bone-body{padding:2px 9px 8px}
 </style></head>
 <body>
 <div class="ph">
@@ -83,10 +96,11 @@
     <div class="ph-vptools">
       <button class="btn small" onclick="frameAll()" title="Encuadrar la cámara">🎯 Encuadrar</button>
       <select class="btn small" onchange="camPreset(this.value); this.selectedIndex=0" title="Ángulo de cámara"><option>📷 Ángulo</option><option value="front">Frontal</option><option value="34">¾ (3/4)</option><option value="side">Lateral</option><option value="back">Trasera</option><option value="top">Cenital</option><option value="low">Contrapicado</option></select>
+      <span id="gizModes" style="display:inline-flex;gap:6px"><button class="btn small on" data-gm="translate" onclick="setGizmoMode('translate')" title="Mover (W)">↔ Mover</button><button class="btn small" data-gm="rotate" onclick="setGizmoMode('rotate')" title="Rotar en Y (E)">⟳ Rotar</button><button class="btn small" data-gm="scale" onclick="setGizmoMode('scale')" title="Escalar (R)">⤢ Escalar</button></span>
       <button class="btn small on" id="gridBtn" onclick="toggleGrid()" title="Rejilla del suelo">Rejilla</button>
       <button class="btn small" id="cycBtn" onclick="toggleCyc(!cycOn)" title="Estudio: suelo y pared (ciclorama)">Estudio</button>
     </div>
-    <div class="ph-hud" id="hud">Arrastra para orbitar · rueda = zoom · clic en un Pokémon para moverlo</div>
+    <div class="ph-hud" id="hud">Arrastra para orbitar · rueda = zoom · clic en un Pokémon para seleccionarlo</div>
   </div>
 
   <aside class="ph-side ph-right">
@@ -108,7 +122,7 @@
 
     <div class="acc collapsed" data-k="cam"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">🎥</span>Cámara<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
       <div class="acc-b">
-        <div class="row2" style="gap:8px"><span class="muted">Tipo</span><select id="camType" onchange="setCamType(this.value)" style="flex:1"><option value="persp">Perspectiva</option><option value="ortho">Ortográfica</option></select></div>
+        <div class="row2" style="gap:8px"><span class="muted">Tipo</span><select id="camType" onchange="setCamType(this.value)" style="flex:1"><option value="persp">Perspectiva</option><option value="ortho" selected>Ortográfica</option></select></div>
         <label class="pl">Campo de visión (FOV)</label><div class="sline"><input type="range" id="fovRange" min="20" max="80" step="1" value="45" oninput="setFOV(this.value); $('fovV').textContent=this.value+'°'"><span class="sv" id="fovV">45°</span></div>
         <label class="row2" style="font-size:12px;color:var(--dim);margin-top:8px"><input type="checkbox" id="aoBox" onchange="setAutoOrbit(this.checked)"> Giro automático</label>
       </div>
@@ -162,7 +176,18 @@
         <label class="pl">Animado (duración)</label>
         <div class="sline"><input type="range" id="recSecs" min="1" max="20" value="4" oninput="$('rsV').textContent=this.value+'s'"><span class="sv" id="rsV">4s</span></div>
         <label class="row2" style="font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="recTurn" checked> Giro 360°</label>
+        <label class="pl">Punto de inicio del giro <span class="muted" style="font-weight:400">(qué lado mira al empezar)</span></label>
+        <div class="sline"><input type="range" id="spinStart" min="0" max="360" step="5" value="0" oninput="setSpinStart(this.value); $('ssV').textContent=this.value+'°'"><span class="sv" id="ssV">0°</span></div>
         <div class="row2" style="margin-top:8px;gap:6px"><button class="btn small primary" id="recBtn" onclick="toggleRecord()" style="flex:1">● WebM</button><button class="btn small" id="gifBtn" onclick="exportGIF(+$('recSecs').value||4,$('recTurn').checked)" style="flex:1">🎞️ GIF</button></div>
+        <label class="pl">Hoja de contacto · ángulos</label>
+        <div id="csAngles" class="qbtns" style="flex-wrap:wrap">
+          <button class="btn small on" data-ang="front" onclick="this.classList.toggle('on')">Frontal</button>
+          <button class="btn small on" data-ang="34" onclick="this.classList.toggle('on')">¾</button>
+          <button class="btn small on" data-ang="side" onclick="this.classList.toggle('on')">Lateral</button>
+          <button class="btn small on" data-ang="back" onclick="this.classList.toggle('on')">Trasera</button>
+          <button class="btn small" data-ang="top" onclick="this.classList.toggle('on')">Cenital</button>
+          <button class="btn small" data-ang="low" onclick="this.classList.toggle('on')">Contrapicado</button>
+        </div>
         <button class="btn small" onclick="contactSheet()" style="margin-top:8px;width:100%">🗂️ Hoja de contacto</button>
         <div class="muted" style="margin-top:8px;font-size:11px">WebM = mejor peso/calidad · GIF = compatible en todas partes (más pesado).</div>
       </div>
@@ -211,9 +236,26 @@ const fill=new THREE.DirectionalLight(0xffffff,0.45); fill.position.set(-60,20,-
 const back=new THREE.DirectionalLight(0xffe6b0,0.6); back.position.set(0,60,-80);
 scene.add(amb,key,fill,back);
 const stage=new THREE.Group(); scene.add(stage);
+// ===== gizmo de transformación (ejes 3D) — UNO solo para toda la sesión, SIEMPRE en scene (nunca en stage: su plano interno es 100000² y reventaría los Box3 de frameAll/camPreset) =====
+let gizmoDragging=false, gizmoMode='translate', gizmoPrevAuto=false, userGizmoHidden=false;
+const tc=new THREE.TransformControls(camera,canvas); tc.setSize(0.8); tc.setSpace('local'); scene.add(tc);   // local: el eje Y del gizmo coincide con el rotY que usa applyTransform
+function syncControls(){ controls.enabled=!(bodyDragging||gizmoDragging); }   // ÚNICA fuente de controls.enabled
+function tcResize(){ if(camera.isOrthographicCamera) tc.setSize(0.8*(40/Math.max(1,orthoSize))); else tc.setSize(0.8); }   // en ortho el mango escala por (top-bottom): compensar
+function setGizmoMode(m){ gizmoMode=m; tc.setMode(m);
+  if(m==='rotate'){ tc.showX=false; tc.showZ=false; tc.showY=true; } else { tc.showX=true; tc.showY=true; tc.showZ=true; }   // rotate = solo anillo Y
+  document.querySelectorAll('#gizModes .btn').forEach(b=>b.classList.toggle('on',b.dataset.gm===m)); updateHud(); }
+tc.addEventListener('dragging-changed',e=>{ gizmoDragging=e.value;
+  if(e.value){ gizmoPrevAuto=autoOrbit; autoOrbit=false; }   // pausar auto-giro durante el arrastre (si no, el parent rota y el drag "patina")
+  else { autoOrbit=gizmoPrevAuto; renderActorProps(); }       // re-sync del panel SOLO al soltar/cancelar (dragging-changed(false) siempre se dispara)
+  syncControls(); });
+tc.addEventListener('objectChange',()=>{ const a=actors[sel]; if(!a||tc.object!==a.group) return;   // el gizmo solo ALIMENTA a.t (que es la fuente de verdad)
+  if(gizmoMode==='translate'){ a.t.x=a.group.position.x; a.t.y=a.group.position.y; a.t.z=a.group.position.z; }
+  else if(gizmoMode==='rotate'){ const e=new THREE.Euler().setFromQuaternion(a.group.quaternion,'YXZ'); a.t.rotY=e.y; }   // yaw estable
+  else { const c=[a.group.scale.x,a.group.scale.y,a.group.scale.z].reduce((b,v)=>Math.abs(v-a.t.scale)>Math.abs(b-a.t.scale)?v:b, a.t.scale); a.t.scale=THREE.MathUtils.clamp(c,0.2,3); a.group.scale.setScalar(a.t.scale); }   // escala uniforme forzada
+  syncPropInputs(a); });
 // captador de sombra: plano invisible que SOLO muestra la sombra (asienta el modelo aunque el fondo sea transparente)
-const shadowCatcher=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000), new THREE.ShadowMaterial({opacity:0.3})); shadowCatcher.rotation.x=-Math.PI/2; shadowCatcher.receiveShadow=true; scene.add(shadowCatcher);
-let grid=new THREE.GridHelper(200,40,0x3a3026,0x2f261d); scene.add(grid); let gridOn=true;
+const shadowCatcher=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000), new THREE.ShadowMaterial({opacity:0.3, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1})); shadowCatcher.rotation.x=-Math.PI/2; shadowCatcher.receiveShadow=true; scene.add(shadowCatcher);   // polygonOffset: empuja el plano de sombra en profundidad para que NO pelee (z-fighting) con la rejilla/base en perspectiva
+let grid=new THREE.GridHelper(200,40,0x3a3026,0x2f261d); grid.position.y=0.02; scene.add(grid); let gridOn=true;   // un pelín por encima del plano de sombra (evita coplanaridad)
 let shadowsOn=true, autoOrbit=false, autoSpeed=0.01;
 // ciclorama (suelo + pared trasera del mismo color, look de estudio)
 let cyc=null, cycOn=false, cycColor='#2a2e36';
@@ -242,31 +284,40 @@ function setTemp(v){ lightState.temp=v; applyLights(); }
 function updateCamAspect(aspect){ if(camera.isPerspectiveCamera){ camera.aspect=aspect; } else { camera.left=-orthoSize*aspect; camera.right=orthoSize*aspect; camera.top=orthoSize; camera.bottom=-orthoSize; } camera.updateProjectionMatrix(); }
 function resize3(){ if(recording) return; const w=canvas.clientWidth,h=canvas.clientHeight; if(w&&h&&(canvas.width!==w||canvas.height!==h)){ renderer.setSize(w,h,false); updateCamAspect(w/h); } }
 function setCamType(v){ const aspect=(canvas.clientWidth||1)/(canvas.clientHeight||1);
-  if(v==='ortho'){ if(camera.isOrthographicCamera) return; const dist=PERSP.position.distanceTo(controls.target); orthoSize=Math.max(8,Math.tan(PERSP.fov*Math.PI/360)*dist); ORTHO.position.copy(PERSP.position); ORTHO.quaternion.copy(PERSP.quaternion); camera=ORTHO; }
+  if(v==='ortho'){ if(camera.isOrthographicCamera) return; const dist=PERSP.position.distanceTo(controls.target); orthoSize=Math.max(8,Math.tan(PERSP.fov*Math.PI/360)*dist); ORTHO.zoom=1; ORTHO.position.copy(PERSP.position); ORTHO.quaternion.copy(PERSP.quaternion); camera=ORTHO; }
   else { if(camera.isPerspectiveCamera) return; PERSP.position.copy(ORTHO.position); PERSP.quaternion.copy(ORTHO.quaternion); camera=PERSP; const fr2=$('fovRange'); if(fr2){ fr2.value=PERSP.fov; const fv=$('fovV'); if(fv) fv.textContent=Math.round(PERSP.fov)+'°'; } }
-  controls.object=camera; updateCamAspect(aspect); controls.update(); const fr=$('fovRange'); if(fr) fr.disabled=(v==='ortho'); }
+  controls.object=camera; tc.camera=camera; updateCamAspect(aspect); tcResize(); controls.update(); const fr=$('fovRange'); if(fr) fr.disabled=(v==='ortho'); }
 function setFOV(v){ PERSP.fov=+v; if(camera===PERSP){ PERSP.updateProjectionMatrix(); } }
 function setAutoOrbit(on){ autoOrbit=on; }
+let spinStart=0;   // ángulo (rad) desde el que parte el giro 360 del GIF/WebM
+function setSpinStart(v){ spinStart=(+v)*Math.PI/180; if(!recording&&!autoOrbit) stage.rotation.y=spinStart; }   // preview en vivo del lado inicial cuando no se está grabando
 function applyTransform(a){ a.group.position.set(a.t.x,a.t.y,a.t.z); a.group.rotation.set(0,a.t.rotY,0); a.group.scale.setScalar(a.t.scale); }
+const DEG=Math.PI/180;
+function applyPose(a){ if(!a.pose||!a.bones) return; const anim=(a.clip&&a.clip.bones)||null; for(const bn in a.pose){ const g=a.bones[bn]; if(!g) continue; const P=a.pose[bn]; const r=g.userData.rest;
+  if(anim&&anim[bn]){ g.rotation.x+=P[0]*DEG; g.rotation.y+=P[1]*DEG; g.rotation.z+=P[2]*DEG; }   // el clip ya puso reposo+anim este frame → sumamos pose encima
+  else { g.rotation.set(r.rx+P[0]*DEG, r.ry+P[1]*DEG, r.rz+P[2]*DEG); } } }                       // sin animar este frame → absoluta (idempotente, no se acumula)
 let recording=false, turntable=false, recStart=0, recDur=4000, mediaRec=null;
 function loop(){ requestAnimationFrame(loop); resize3(); const now=performance.now();
-  for(const a of actors){ if(a.clip&&window.applyAnimClip){ const t=a.animOn?((now-a.animStart)/1000):(a.frameT||0); window.applyAnimClip(a.model,a.clip,t); } applyTransform(a); }
+  if(tc.object&&tc.object.parent===null) tc.detach();   // blindaje: nunca apuntar a un group fuera del grafo
+  for(const a of actors){ if(a.clip&&window.applyAnimClip){ const t=a.animOn?((now-a.animStart)/1000):(a.frameT||0); window.applyAnimClip(a.model,a.clip,t); } applyPose(a);
+    if(!(gizmoDragging&&tc.object===a.group)) applyTransform(a); }   // durante el arrastre del gizmo, él manda (no pelear por el frame)
   if(autoOrbit&&!recording) stage.rotation.y+=autoSpeed;
-  if(recording&&turntable&&recDur>0) stage.rotation.y=((now-recStart)/recDur)*Math.PI*2;
+  if(recording&&turntable&&recDur>0) stage.rotation.y=spinStart+((now-recStart)/recDur)*Math.PI*2;
+  tc.visible = !recording && !busyExport && sel>=0 && !!tc.object && !userGizmoHidden;   // el gizmo NUNCA sale en foto/vídeo, ni sin selección
   controls.update(); renderer.render(scene,camera); }
 
-function frameAll(){ if(!actors.length) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(stage); if(b.isEmpty()) return; const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16; camera.position.set(c.x+r*0.7, c.y+s.y*0.15+r*0.5, c.z+r*1.8); controls.target.copy(c); controls.update(); if(camera.isOrthographicCamera){ orthoSize=r*0.95; updateCamAspect((canvas.clientWidth||1)/(canvas.clientHeight||1)); } }
+function frameAll(){ if(!actors.length) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(stage); if(b.isEmpty()) return; const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16; camera.position.set(c.x+r*0.7, c.y+s.y*0.15+r*0.5, c.z+r*1.8); controls.target.copy(c); controls.update(); if(camera.isOrthographicCamera){ camera.zoom=1; orthoSize=r*0.95; updateCamAspect((canvas.clientWidth||1)/(canvas.clientHeight||1)); } tcResize(); }
 
 // ===== actores (modelos en la escena) =====
 const actors=[]; let sel=-1, actorSeq=0;
 async function buildActor(name, geoJson, textureUrl, animationJson, shinyUrl){
   const tex=await loadTex(textureUrl); applyTexEncoding(tex);
   let inner; try{ inner=window.geoToThreeGroup(geoJson,tex); }catch(e){ toast('Modelo inválido: '+e.message,'err'); return; }
-  let mat=null; inner.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; if(!mat) mat=o.material; } });   // sombras + ref al material para shiny
+  let mat=null; const bones={}; inner.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; if(!mat) mat=o.material; } if(o.userData&&o.userData.rest&&o.name) bones[o.name]=o; });   // sombras + material (shiny) + huesos (pose)
   inner.updateMatrixWorld(true); const bb=new THREE.Box3().setFromObject(inner),c=bb.getCenter(new THREE.Vector3()); inner.position.set(-c.x,-bb.min.y,-c.z);   // base al suelo y centrado
   const group=new THREE.Group(); group.add(inner);
   const animNames=(animationJson&&animationJson.animations)?Object.keys(animationJson.animations):[];
-  const a={ id:++actorSeq, name, model:inner, group, mat, texNormal:tex, texShiny:null, shinyUrl:shinyUrl||null, useShiny:false, animation:animationJson, animNames, clip:null, animOn:true, animStart:performance.now(), frameT:0, t:{x:0,y:0,z:0,rotY:0,scale:1} };
+  const a={ id:++actorSeq, name, model:inner, group, mat, texNormal:tex, texShiny:null, shinyUrl:shinyUrl||null, useShiny:false, bones, pose:{}, poseOpen:{}, animation:animationJson, animNames, clip:null, animOn:true, animStart:performance.now(), frameT:0, t:{x:0,y:0,z:0,rotY:0,scale:1} };
   if(animNames.length&&window.buildAnimClip) a.clip=window.buildAnimClip(animationJson);
   const span=Math.max(bb.max.x-bb.min.x,10); a.t.x=actors.length?(actors.length%2?1:-1)*Math.ceil(actors.length/2)*span:0;   // reparte a los lados
   stage.add(group); actors.push(a); selectActor(actors.length-1); if(actors.length===1) frameAll();
@@ -294,32 +345,89 @@ async function addPackActor(m){ if(!PROJECT||!PROJECT.root) return; toast('Carga
     if(!texUrl) toast('No encontré textura en el pack para «'+m.label+'» (se ve sin textura)','info');
   }catch(e){ toast('Error: '+e.message,'err'); }
 }
-function removeActor(i){ const a=actors[i]; if(!a)return; stage.remove(a.group); actors.splice(i,1); if(sel>=actors.length) sel=actors.length-1; renderActorList(); renderActorProps(); }
-function selectActor(i){ sel=i; if(actors[i]) actors[i].animStart=performance.now(); renderActorList(); renderActorProps(); }
-function renderActorList(){ const el=$('actorList'); const es=$('emptyState'); if(es) es.style.display=actors.length?'none':'flex'; if(!actors.length){ el.innerHTML='<div class="muted" style="font-size:12px">Aún no hay Pokémon en la escena.</div>'; return; } el.innerHTML='';
+function removeActor(i){ const a=actors[i]; if(!a)return; if(tc.object===a.group) tc.detach();   // detach ANTES de sacarlo del grafo (si no, console.error por frame)
+  stage.remove(a.group); actors.splice(i,1); if(i<sel) sel--; if(sel>=actors.length) sel=actors.length-1;   // i<sel: el splice desplaza los índices → mantener seleccionado el MISMO actor
+  if(actors[sel]) tc.attach(actors[sel].group); else { sel=-1; tc.detach(); } renderActorList(); renderActorProps(); }
+function selectActor(i){ sel=i; if(actors[i]){ actors[i].animStart=performance.now(); tc.attach(actors[i].group); } else tc.detach(); renderActorList(); renderActorProps(); }
+function deselect(){ if(sel<0) return; sel=-1; tc.detach(); renderActorList(); renderActorProps(); }   // quita el gizmo y limpia el panel
+function renderActorList(){ updateHud(); const el=$('actorList'); const es=$('emptyState'); if(es) es.style.display=actors.length?'none':'flex'; if(!actors.length){ el.innerHTML='<div class="muted" style="font-size:12px">Aún no hay Pokémon en la escena.</div>'; return; } el.innerHTML='';
   actors.forEach((a,i)=>{ const d=document.createElement('div'); d.className='actor-row'+(i===sel?' on':''); const n=document.createElement('span'); n.className='an'; n.textContent=a.name.replace(/_/g,' '); const x=document.createElement('span'); x.className='ax'; x.textContent='✕'; x.title='Quitar'; x.onclick=e=>{ e.stopPropagation(); removeActor(i); }; d.appendChild(n); d.appendChild(x); d.onclick=()=>selectActor(i); el.appendChild(d); }); }
 function renderActorProps(){ const el=$('actorProps'); if(sel<0||!actors[sel]){ el.innerHTML=''; return; } const a=actors[sel];
   const opts=a.animNames.map(n=>'<option value="'+esc(n)+'"'+(a.clip&&a.clip.name===n?' selected':'')+'>'+esc(n.replace(/^animation\.[^.]+\./,''))+'</option>').join('');
   el.innerHTML='<div class="muted" style="margin-bottom:4px;text-transform:capitalize">'+a.name.replace(/_/g,' ')+'</div>'+
     (a.animNames.length?('<label class="pl">Animación</label><div class="row2"><select id="acAnim" onchange="setActorAnim(this.value)" style="flex:1">'+opts+'</select><button class="btn small" id="acPlay" onclick="toggleActorAnim()" title="Reproducir/pausar">'+(a.animOn?'⏸':'▶')+'</button></div>'+(a.clip&&a.clip.length?('<label class="pl">Frame (congelar pose)</label><input type="range" min="0" max="'+a.clip.length.toFixed(2)+'" step="0.02" value="'+(a.frameT||0).toFixed(2)+'" oninput="setFrame(this.value)">'):'')):'<div class="muted">Sin animaciones</div>')+
-    '<label class="pl">Rotación</label><input type="range" min="0" max="360" value="'+Math.round(a.t.rotY*180/Math.PI)+'" oninput="setT(\'rotY\',this.value*Math.PI/180)">'+
-    '<label class="pl">Tamaño</label><input type="range" min="20" max="300" value="'+Math.round(a.t.scale*100)+'" oninput="setT(\'scale\',this.value/100)">'+
-    '<label class="pl">Altura</label><input type="range" min="-20" max="50" value="'+Math.round(a.t.y)+'" oninput="setT(\'y\',+this.value)">'+
+    '<label class="pl">Rotación</label><input type="range" id="acRot" min="0" max="360" value="'+Math.round((((a.t.rotY%(2*Math.PI))+2*Math.PI)%(2*Math.PI))*180/Math.PI)+'" oninput="setT(\'rotY\',this.value*Math.PI/180)">'+
+    '<label class="pl">Tamaño</label><input type="range" id="acScale" min="20" max="300" value="'+Math.round(a.t.scale*100)+'" oninput="setT(\'scale\',this.value/100)">'+
+    '<label class="pl">Altura</label><input type="range" id="acY" min="-20" max="50" value="'+Math.round(a.t.y)+'" oninput="setT(\'y\',+this.value)">'+
     '<label class="pl">Posición X</label><input type="range" id="acX" min="-80" max="80" value="'+Math.round(a.t.x)+'" oninput="setT(\'x\',+this.value)">'+
     '<label class="pl">Posición Z</label><input type="range" id="acZ" min="-80" max="80" value="'+Math.round(a.t.z)+'" oninput="setT(\'z\',+this.value)">'+
+    poseUI(a)+
     '<div class="row2" style="margin-top:10px;gap:6px">'+(a.shinyUrl?'<button class="btn small'+(a.useShiny?' on':'')+'" onclick="toggleShiny()" title="Ver textura shiny">✨ Shiny</button>':'')+'<button class="btn small danger" onclick="removeActor('+sel+')">Quitar</button></div>';
 }
+function prettyBone(b){ return b.replace(/[_\-.]+/g,' ').replace(/\bl\b/gi,'izq').replace(/\br\b/gi,'der').trim(); }   // nombre de hueso legible
+function isPosed(a,b){ return !!(a.pose&&a.pose[b]&&a.pose[b].some(v=>v)); }
+function poseUI(a){ const bn=a.bones?Object.keys(a.bones):[]; if(!bn.length) return '<label class="pl" style="margin-top:10px">🦴 Pose</label><div class="muted" style="font-size:11px">Este modelo no expone huesos para mover.</div>';
+  if(!a.poseOpen) a.poseOpen={};
+  const has=b=>Object.prototype.hasOwnProperty.call(a.poseOpen,b);
+  const inList=bn.filter(b=>isPosed(a,b)||has(b));   // en la lista: modificados o añadidos (aunque estén plegados)
+  let h='<label class="pl" style="margin-top:10px">🦴 Pose por huesos'+(inList.length?(' <span class="muted" style="font-weight:400">· '+inList.length+'</span>'):'')+'</label>'+
+    '<select onchange="addPoseBone(this.value); this.selectedIndex=0" style="width:100%"><option value="">➕ Añadir hueso…</option>'+
+    bn.map(b=>'<option value="'+esc(b)+'">'+(isPosed(a,b)?'● ':'')+esc(prettyBone(b))+'</option>').join('')+'</select>';
+  if(!inList.length) return h+'<div class="muted" style="font-size:11px;margin-top:4px">Elige un hueso (cabeza, alas, patas, cola…) y se añadirá a la lista. Ábrelo para ajustar sus giros.</div>';
+  const ax=[['↕ Inclinar','adelante · atrás'],['↔ Girar','izquierda · derecha'],['⟲ Ladear','de un lado · al otro']];
+  h+='<div class="bone-list">';
+  for(const b of inList){ const P=(a.pose&&a.pose[b])||[0,0,0]; const open=!!a.poseOpen[b];
+    h+='<div class="bone-item'+(open?' on':'')+'">'+
+       '<div class="bone-head" data-b="'+esc(b)+'" onclick="togglePoseBone(this.dataset.b)">'+
+         '<span class="chev">'+(open?'▾':'▸')+'</span><span class="bn">'+esc(prettyBone(b))+'</span>'+
+         (open?'':'<span class="bv">'+Math.round(P[0])+'° · '+Math.round(P[1])+'° · '+Math.round(P[2])+'°</span>')+
+         '<span class="bx" data-b="'+esc(b)+'" onclick="event.stopPropagation();resetBoneNamed(this.dataset.b)" title="Quitar este hueso">✕</span>'+
+       '</div>';
+    if(open){ h+='<div class="bone-body">';
+      for(let i=0;i<3;i++) h+='<label class="pl" style="margin-top:4px">'+ax[i][0]+' <span class="muted" style="font-weight:400">— '+ax[i][1]+'</span></label>'+
+        '<div class="sline"><input type="range" min="-180" max="180" value="'+Math.round(P[i])+'" data-b="'+esc(b)+'" oninput="setPoseAxis(this.dataset.b,'+i+',this.value,this)" onchange="renderActorProps()"><span class="sv">'+Math.round(P[i])+'°</span></div>';
+      h+='</div>'; }
+    h+='</div>';
+  }
+  h+='</div>';
+  if(inList.some(b=>isPosed(a,b))) h+='<button class="btn small" onclick="resetPose()" style="margin-top:6px;width:100%">↺ Restablecer toda la pose</button>';
+  return h;
+}
+function addPoseBone(b){ const a=actors[sel]; if(!a||!b)return; if(!a.poseOpen) a.poseOpen={}; a.poseOpen[b]=true; renderActorProps(); }   // añade y abre la fila del hueso
+function togglePoseBone(b){ const a=actors[sel]; if(!a||!b)return; if(!a.poseOpen) a.poseOpen={}; a.poseOpen[b]=!(a.poseOpen[b]===true); renderActorProps(); }   // plegar/desplegar: la fila SE QUEDA en la lista (solo la ✕ la quita)
+function setPoseAxis(b,axis,v,inp){ const a=actors[sel]; if(!a||!b)return; if(!a.pose) a.pose={}; if(!a.pose[b]) a.pose[b]=[0,0,0]; a.pose[b][axis]=+v;
+  if(inp){ const lab=inp.parentElement.querySelector('.sv'); if(lab) lab.textContent=Math.round(+v)+'°'; } }   // oninput: solo el valor (sin re-render, no pierde el foco); re-render en onchange (al soltar)
+function resetBoneNamed(b){ const a=actors[sel]; if(!a||!b)return; const g=a.bones&&a.bones[b]; if(g&&g.userData.rest){ const r=g.userData.rest; g.rotation.set(r.rx,r.ry,r.rz); } if(a.pose) delete a.pose[b]; if(a.poseOpen) delete a.poseOpen[b]; renderActorProps(); }   // quita un hueso de la lista
+function resetPose(){ const a=actors[sel]; if(!a)return; if(a.bones) for(const bn in a.bones){ const g=a.bones[bn], r=g.userData.rest; if(r) g.rotation.set(r.rx,r.ry,r.rz); } a.pose={}; a.poseOpen={}; renderActorProps(); }
 function setT(k,v){ if(sel<0||!actors[sel])return; actors[sel].t[k]=+v; }
+function syncPropInputs(a){ const set=(id,v)=>{ const el=$(id); if(el) el.value=v; };   // actualiza SOLO .value (sin innerHTML) para no perder el foco mientras se arrastra el gizmo
+  set('acX',Math.round(a.t.x)); set('acZ',Math.round(a.t.z)); set('acY',Math.round(a.t.y));
+  set('acScale',Math.round(a.t.scale*100)); set('acRot',Math.round((((a.t.rotY%(2*Math.PI))+2*Math.PI)%(2*Math.PI))*180/Math.PI)); }
+function updateHud(){ const h=$('hud'); if(!h) return;
+  h.textContent = sel<0 ? 'Arrastra para orbitar · rueda = zoom · clic en un Pokémon para seleccionarlo'
+    : ('Gizmo: '+({translate:'Mover',rotate:'Rotar (Y)',scale:'Escalar'}[gizmoMode])+' · W/E/R cambia modo · F encuadra · Esc deselecciona · Supr borra'); }
+function frameSelected(){ if(sel<0||!actors[sel]) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(actors[sel].group); if(b.isEmpty()) return;
+  const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16;
+  camera.position.set(c.x+r*0.7, c.y+s.y*0.15+r*0.5, c.z+r*1.8); controls.target.copy(c); controls.update();
+  if(camera.isOrthographicCamera){ camera.zoom=1; orthoSize=r*0.95; updateCamAspect((canvas.clientWidth||1)/(canvas.clientHeight||1)); } tcResize(); }
+function toggleGizmoVisible(){ userGizmoHidden=!userGizmoHidden; }
 function setActorAnim(name){ const a=actors[sel]; if(!a)return; a.clip=window.buildAnimClip(a.animation,name); a.animStart=performance.now(); a.animOn=true; a.frameT=0; renderActorProps(); }
 function toggleActorAnim(){ const a=actors[sel]; if(!a)return; a.animOn=!a.animOn; if(a.animOn){ a.animStart=performance.now()-(a.frameT||0)*1000; } else { a.frameT=((performance.now()-a.animStart)/1000)%((a.clip&&a.clip.length)||1); } renderActorProps(); }
 function setFrame(v){ const a=actors[sel]; if(!a||!a.clip)return; a.frameT=+v; a.animOn=false; const b=$('acPlay'); if(b) b.textContent='▶'; }   // congelar pose en un frame concreto
 
 // arrastrar un modelo por el suelo (clic + arrastrar)
-const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0); let dragging=false;
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0); let bodyDragging=false;
 function setNdc(e){ const r=canvas.getBoundingClientRect(); ndc.x=((e.clientX-r.left)/r.width)*2-1; ndc.y=-((e.clientY-r.top)/r.height)*2+1; }
-canvas.addEventListener('pointerdown',e=>{ if(e.button!==0||!actors.length) return; setNdc(e); ray.setFromCamera(ndc,camera); const hits=ray.intersectObjects(actors.map(a=>a.group),true); if(!hits.length) return; let o=hits[0].object; while(o&&o.parent!==stage) o=o.parent; const i=actors.findIndex(a=>a.group===o); if(i<0) return; selectActor(i); dragging=true; controls.enabled=false; try{ canvas.setPointerCapture(e.pointerId); }catch(_){ } });
-canvas.addEventListener('pointermove',e=>{ if(!dragging||sel<0) return; setNdc(e); ray.setFromCamera(ndc,camera); const p=new THREE.Vector3(); const dp=new THREE.Plane(new THREE.Vector3(0,1,0), -(actors[sel].t.y||0)); if(ray.ray.intersectPlane(dp,p)){ actors[sel].t.x=p.x; actors[sel].t.z=p.z; } });
-function endDrag(){ if(dragging){ dragging=false; controls.enabled=true; renderActorProps(); } }
+canvas.addEventListener('pointerdown',e=>{ if(e.button!==0) return;
+  if(tc.object&&(tc.axis||tc.dragging)||gizmoDragging) return;   // el puntero está sobre/en un mango → lo gestiona el gizmo (no robar el clic ni doble-arrastrar)
+  if(!actors.length) return;
+  setNdc(e); ray.setFromCamera(ndc,camera); const hits=ray.intersectObjects(actors.map(a=>a.group),true);
+  if(!hits.length){ deselect(); return; }   // clic en vacío → quitar el gizmo
+  let o=hits[0].object; while(o&&o.parent!==stage) o=o.parent; const i=actors.findIndex(a=>a.group===o);
+  if(i<0){ deselect(); return; }
+  selectActor(i); bodyDragging=true; syncControls(); try{ canvas.setPointerCapture(e.pointerId); }catch(_){ } });
+canvas.addEventListener('pointermove',e=>{ if(!bodyDragging||sel<0||gizmoDragging) return; setNdc(e); ray.setFromCamera(ndc,camera); const p=new THREE.Vector3(); const dp=new THREE.Plane(new THREE.Vector3(0,1,0), -(actors[sel].t.y||0)); if(ray.ray.intersectPlane(dp,p)){ actors[sel].t.x=p.x; actors[sel].t.z=p.z; } });
+function endDrag(){ if(bodyDragging){ bodyDragging=false; syncControls(); renderActorProps(); } }
 canvas.addEventListener('pointerup',endDrag);
 canvas.addEventListener('pointercancel',endDrag);
 window.addEventListener('pointerup',endDrag);   // si se suelta fuera del lienzo, no dejar la cámara bloqueada
@@ -374,20 +482,22 @@ function setExposure(v){ renderer.toneMappingExposure=+v; }
 
 // ===== exportar =====
 let busyExport=false;
-async function exportPNG(scale){ if(busyExport||recording) return; busyExport=true;
+async function exportPNG(scale){ if(busyExport||recording) return; busyExport=true; recording=true;   // recording congela resize3 + oculta el gizmo durante los dos render
   try{ const cw=Math.round(canvas.clientWidth),ch=Math.round(canvas.clientHeight); const w=Math.round(cw*scale),h=Math.round(ch*scale);
-    renderer.setSize(w,h,false); updateCamAspect(w/h); renderer.render(scene,camera);
+    tc.visible=false; renderer.setSize(w,h,false); updateCamAspect(w/h); renderer.render(scene,camera);
     const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d');
     let ok=true; try{ g.drawImage(canvas,0,0,w,h); }catch(e){ ok=false; toast('No se pudo exportar: '+e.message,'err'); }
     const ov=buildOverlay(w,h); if(ov) g.drawImage(ov,0,0);
     renderer.setSize(cw,ch,false); updateCamAspect(cw/ch); renderer.render(scene,camera);
     if(ok) await saveExport((actors[0]?actors[0].name:'foto')+'.png', cv.toDataURL('image/png').replace(/^data:[^,]+,/,''));
-  } finally{ busyExport=false; }
+  } finally{ busyExport=false; recording=false; }
 }
+const ANGLE_LABELS={front:'Frontal','34':'¾',side:'Lateral',back:'Trasera',top:'Cenital',low:'Contrapicado'};
 async function contactSheet(){ if(!actors.length){ toast('Añade al menos un Pokémon','err'); return; } if(busyExport||recording) return; busyExport=true;
-  const angles=[['front','Frontal'],['34','¾'],['side','Lateral'],['back','Trasera']]; const cell=512, cols=2, W=cell*cols, H=cell*2;
+  let picked=[...document.querySelectorAll('#csAngles .btn.on')].map(b=>b.dataset.ang); if(!picked.length) picked=['front','34','side','back'];
+  const angles=picked.map(k=>[k,ANGLE_LABELS[k]||k]); const cell=512, cols=angles.length<=1?1:(angles.length<=4?2:3), rows=Math.ceil(angles.length/cols), W=cell*cols, H=cell*rows;
   const savePos=camera.position.clone(), saveTgt=controls.target.clone(), savePR=renderer.getPixelRatio(), savedRot=stage.rotation.y, cw=canvas.clientWidth||640, ch=canvas.clientHeight||480;
-  recording=true; renderer.setPixelRatio(1); renderer.setSize(cell,cell,false); updateCamAspect(1);
+  recording=true; tc.visible=false; renderer.setPixelRatio(1); renderer.setSize(cell,cell,false); updateCamAspect(1);   // ocultar gizmo ANTES del primer render síncrono (el invariante del loop solo actúa en el siguiente tick)
   const out=document.createElement('canvas'); out.width=W; out.height=H; const g=out.getContext('2d'); g.fillStyle='#15171c'; g.fillRect(0,0,W,H);
   const tmp=document.createElement('canvas'); tmp.width=cell; tmp.height=cell; const tg=tmp.getContext('2d');
   try{
@@ -403,21 +513,22 @@ async function contactSheet(){ if(!actors.length){ toast('Añade al menos un Pok
 }
 function toggleRecord(){ if(recording){ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); return; }
   if(!('MediaRecorder' in window)||!canvas.captureStream){ toast('Tu sistema no soporta grabación de vídeo','err'); return; }
-  const secs=Math.max(1,Math.min(20,+$('recSecs').value||4)); turntable=$('recTurn').checked; recDur=secs*1000; recStart=performance.now(); stage.rotation.y=0;
+  const secs=Math.max(1,Math.min(20,+$('recSecs').value||4)); turntable=$('recTurn').checked; recDur=secs*1000; recStart=performance.now(); stage.rotation.y=spinStart;
   const stream=canvas.captureStream(30); let opts=[{mimeType:'video/webm;codecs=vp9'},{mimeType:'video/webm;codecs=vp8'},{mimeType:'video/webm'},undefined];
   mediaRec=null; for(const o of opts){ try{ mediaRec=o?new MediaRecorder(stream,o):new MediaRecorder(stream); break; }catch(e){} }
   if(!mediaRec){ toast('No se pudo iniciar la grabación','err'); return; }
   const chunks=[]; mediaRec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
-  mediaRec.onstop=()=>{ recording=false; turntable=false; stage.rotation.y=0; try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){} $('recBtn').textContent='● Grabar (WebM)'; $('recBtn').classList.remove('danger');
+  mediaRec.onstop=()=>{ recording=false; turntable=false; stage.rotation.y=spinStart; try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){} $('recBtn').textContent='● Grabar (WebM)'; $('recBtn').classList.remove('danger');
     const blob=new Blob(chunks,{type:'video/webm'}); blobToB64(blob).then(b64=>saveExport((actors[0]?actors[0].name:'foto')+'.webm', b64)); };
-  recording=true; mediaRec.start(); $('recBtn').textContent='■ Detener'; $('recBtn').classList.add('danger');
+  recording=true; tc.visible=false; renderer.render(scene,camera); mediaRec.start(); $('recBtn').textContent='■ Detener'; $('recBtn').classList.add('danger');   // repintar sin gizmo ANTES de capturar el primer frame
   setTimeout(()=>{ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); }, recDur+60);
 }
 
 // ===== presets de cámara y fondo =====
 function camPreset(v){ if(!v||!actors.length) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(stage); if(b.isEmpty()) return; const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16; const cy=c.y+s.y*0.05; let p;
   if(v==='front') p=[c.x,cy,c.z+r*2]; else if(v==='back') p=[c.x,cy,c.z-r*2]; else if(v==='side') p=[c.x+r*2,cy,c.z]; else if(v==='top') p=[c.x,c.y+r*2.6,c.z+0.001]; else if(v==='low') p=[c.x,c.y+s.y*0.05,c.z+r*1.7]; else p=[c.x+r*1.4,c.y+s.y*0.45+r*0.4,c.z+r*1.6];
-  camera.position.set(p[0],p[1],p[2]); controls.target.set(c.x,cy,c.z); controls.update(); }
+  camera.position.set(p[0],p[1],p[2]); controls.target.set(c.x,cy,c.z); controls.update();
+  if(camera.isOrthographicCamera){ camera.zoom=1; orthoSize=r*0.95; const sz=renderer.getSize(new THREE.Vector2()); updateCamAspect((sz.x||1)/(sz.y||1)); tcResize(); } }   // ortho: el tamaño lo da orthoSize/zoom, no la distancia; usar el tamaño REAL del renderer (cuadrado en la hoja de contacto)
 function bgPreset(name){ const a=$('bgColA'),top=$('bgColTop'),bot=$('bgColBot');
   if(name==='night'){ a.value='#0b1020'; setBgMode('color'); return; }
   if(name==='white'){ a.value='#ffffff'; setBgMode('color'); return; }
@@ -432,14 +543,14 @@ async function exportGIF(seconds, turntable){
   const cw=canvas.clientWidth||640, ch=canvas.clientHeight||480, sc=Math.min(1, 420/Math.max(cw,ch));
   const w=Math.max(2,Math.round(cw*sc)), h=Math.max(2,Math.round(ch*sc));
   const btn=$('gifBtn'); if(btn){ btn.disabled=true; btn.textContent='⏳ GIF…'; }
-  recording=true; const savedRot=stage.rotation.y, savedPR=renderer.getPixelRatio();
+  recording=true; tc.visible=false; const savedRot=stage.rotation.y, savedPR=renderer.getPixelRatio();   // ocultar gizmo antes del primer render síncrono
   renderer.setPixelRatio(1); renderer.setSize(w,h,false); updateCamAspect(w/h);
   const cap=document.createElement('canvas'); cap.width=w; cap.height=h; const cx=cap.getContext('2d',{willReadFrequently:true});
   const transparent=(bgMode==='transparent'); const fr=[]; const ov=buildOverlay(w,h);
   try{
     for(let i=0;i<frames;i++){ const t=i/fps;
       for(const a of actors){ if(a.clip&&window.applyAnimClip) window.applyAnimClip(a.model,a.clip, a.animOn? t : (a.frameT||0)); }
-      if(turntable) stage.rotation.y=(i/frames)*Math.PI*2;
+      if(turntable) stage.rotation.y=spinStart+(i/frames)*Math.PI*2;
       renderer.render(scene,camera);
       cx.clearRect(0,0,w,h); cx.drawImage(canvas,0,0,w,h); if(ov) cx.drawImage(ov,0,0);
       fr.push(cx.getImageData(0,0,w,h));
@@ -477,6 +588,24 @@ async function openPicker(){ $('pickerOverlay').style.display='flex'; $('pkSearc
 function closePicker(){ $('pickerOverlay').style.display='none'; }
 let _pt=null; function filterPick(){ clearTimeout(_pt); _pt=setTimeout(()=>renderPick($('pkSearch').value),200); }
 
+// atajos de teclado (gizmo + QOL) — con guard de foco/modificadores/picker para no romper la escritura ni borrar el modelo por accidente
+window.addEventListener('keydown',e=>{
+  const t=e.target; if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable)) return;
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if($('pickerOverlay').style.display!=='none'){ if(e.key==='Escape') closePicker(); return; }
+  switch(e.key){
+    case 'w': case 'W': setGizmoMode('translate'); break;
+    case 'e': case 'E': setGizmoMode('rotate'); break;
+    case 'r': case 'R': setGizmoMode('scale'); break;
+    case 'g': case 'G': toggleGizmoVisible(); break;
+    case 'f': case 'F': frameSelected(); break;
+    case 'Escape': deselect(); break;
+    case 'Delete': case 'Backspace': if(sel>=0) removeActor(sel); break;
+    default: return;
+  }
+  e.preventDefault();
+});
+
 // menú contextual: fondo/encuadre
 if(window.ctxMenu){ ctxMenu.fallback(()=>[ {icon:'🎯',label:'Encuadrar cámara',action:frameAll}, {icon:'➕',label:'Añadir modelo',action:openPicker} ]); }
 
@@ -484,6 +613,6 @@ if(window.ctxMenu){ ctxMenu.fallback(()=>[ {icon:'🎯',label:'Encuadrar cámara
 function toggleAcc(h){ const a=h.parentElement; a.classList.toggle('collapsed'); try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); st[a.dataset.k]=a.classList.contains('collapsed'); localStorage.setItem('cs_photo_acc',JSON.stringify(st)); }catch(e){} }
 function restoreAcc(){ try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); document.querySelectorAll('.acc').forEach(a=>{ if(a.dataset.k in st) a.classList.toggle('collapsed',!!st[a.dataset.k]); }); }catch(e){} }
 restoreAcc();
-applyLights(); applyBg(); layoutCanvas(); renderActorList(); loadModels(); loop();
+applyLights(); applyBg(); layoutCanvas(); renderActorList(); loadModels(); setCamType('ortho'); loop();   // cámara ortográfica por defecto
 </script>
 </body></html>

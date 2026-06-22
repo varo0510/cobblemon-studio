@@ -1,0 +1,81 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cobblemon Studio — Exportar .zip</title>
+<link rel="stylesheet" href="/studio.css">
+<script>(function(){ if(new URLSearchParams(location.search).get('embed')==='1') document.documentElement.classList.add('embed'); })();</script>
+<script src="/tauri-shim.js"></script>
+<script src="/ctxmenu.js"></script>
+<style>
+  .ex{height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+  .ex-top{flex:0 0 auto;padding:16px 22px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .ex-top h1{margin:0 0 3px;font-size:20px}
+  .ex-top .sub{color:var(--dim);font-size:13px;margin:0}
+  .ex-body{flex:1;min-height:0;overflow-y:auto;padding:18px 22px 50px}
+  .ex-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;max-width:760px}
+  .ex-card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+  .ex-card:hover{border-color:var(--line2)}
+  .ex-card .big{font-size:30px}
+  .ex-card h2{margin:0;font-size:16px}
+  .ex-card p{margin:0;font-size:12.5px;color:var(--dim);line-height:1.5;flex:1}
+  .ex-card .btn{justify-content:center}
+  .ex-note{color:var(--faint);font-size:12px;margin-top:16px;max-width:760px}
+  .ex-res{margin-top:18px;max-width:760px}
+  .ex-res .row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);margin-bottom:6px}
+  .ex-res .row .nm{flex:1;font-size:12.5px}
+  .ex-res .row .nm .pth{display:block;font-size:10.5px;color:var(--faint);font-family:var(--font-mono);word-break:break-all}
+  .ex-empty{color:var(--dim);text-align:center;margin-top:50px}
+  .badge2{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:20px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+</style></head>
+<body>
+<div class="ex">
+  <div class="ex-top">
+    <h1>⬇️ Exportar .zip</h1>
+    <p class="sub">Empaqueta el pack que tienes abierto, <b>tal cual</b> (conservando su <code>pack.mcmeta</code>). Elige dónde guardarlo.</p>
+  </div>
+  <div class="ex-body" id="body"><div class="ex-empty"><span class="spinner"></span></div></div>
+</div>
+<div id="toaster"></div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const PROJECT=(()=>{ try{ return JSON.parse(localStorage.getItem('cs_current')||'null'); }catch(e){ return null; } })();
+async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg,type){ const h=$('toaster'); if(!h)return; const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg; h.appendChild(t); const c=()=>{ if(!t.parentNode)return; t.classList.add('out'); setTimeout(()=>t.parentNode&&t.parentNode.removeChild(t),300); }; const tm=setTimeout(c,4000); t.onclick=()=>{clearTimeout(tm);c();}; }
+
+function render(){
+  if(!PROJECT||!PROJECT.root){ $('body').innerHTML='<div class="ex-empty">No hay ningún pack abierto.<br>Abre o crea un pack desde el Inicio.</div>'; return; }
+  const name=(PROJECT.root.split(/[\\/]/).pop())||'pack';
+  $('body').innerHTML=
+    '<div class="ex-cards">'+
+    '<div class="ex-card"><div class="big">📦</div><h2>Un solo .zip <span class="badge2">recomendado</span></h2>'+
+      '<p>Todo junto en un único archivo (data + assets + pack.mcmeta). Sirve a la vez como datapack y resource pack — lo más cómodo para compartir o meter en un modpack.</p>'+
+      '<button class="btn primary" id="bCombo" onclick="doExport(\'combined\')">Guardar como… (1 zip)</button></div>'+
+    '<div class="ex-card"><div class="big">🗂️</div><h2>Datapack + Resource pack</h2>'+
+      '<p>Dos .zip separados: uno con <code>data/</code> y otro con <code>assets/</code>, cada uno con su pack.mcmeta. Útil si los sueltas por separado en <code>datapacks/</code> y <code>resourcepacks/</code>.</p>'+
+      '<button class="btn" id="bSplit" onclick="doExport(\'split\')">Elegir carpeta… (2 zip)</button></div>'+
+    '</div>'+
+    '<div class="ex-note">Pack abierto: <b>'+esc(name)+'</b>. No se modifica nada del pack; solo se crea el/los .zip donde indiques.</div>'+
+    '<div class="ex-res" id="res"></div>';
+}
+
+async function doExport(mode){
+  const btns=[$('bCombo'),$('bSplit')]; btns.forEach(b=>b&&(b.disabled=true));
+  let r; try{ r=await csInvoke(mode==='combined'?'export_pack_combined':'export_pack_split',{path:PROJECT.root}); }
+  catch(e){ r={error:(e&&e.message)||String(e)}; }
+  btns.forEach(b=>b&&(b.disabled=false));
+  if(!r){ toast('No se pudo exportar','err'); return; }
+  if(r.cancelled){ return; }   // el usuario cerró el diálogo
+  if(r.error){ toast('No se pudo exportar: '+esc(r.error),'err'); return; }
+  const zips = r.zips || (r.file?[{kind:'pack',file:r.file,files:r.files,sizeKB:r.sizeKB}]:[]);
+  let h='<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:0 0 8px">✅ Exportado</h3>';
+  zips.forEach(z=>{ const fname=(z.file.split(/[\\/]/).pop())||z.file;
+    h+='<div class="row"><span style="font-size:18px">📦</span><span class="nm"><b>'+esc(fname)+'</b> <span class="sub" style="font-size:11px">· '+(z.sizeKB||0)+' KB · '+(z.files||0)+' archivos</span><span class="pth">'+esc(z.file)+'</span></span><button class="btn small" onclick="openFolderOf(\''+esc(encodeURIComponent(z.file))+'\')">📂 Abrir carpeta</button></div>'; });
+  $('res').innerHTML=h;
+  toast('✅ Exportado','ok');
+}
+function openFolderOf(enc){ const f=decodeURIComponent(enc); const dir=f.replace(/[\\/][^\\/]*$/,''); csInvoke('open_folder',{path:dir}).catch(()=>{}); }
+
+render();
+</script>
+</body></html>

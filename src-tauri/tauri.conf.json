@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Cobblemon Studio",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "identifier": "com.varo.cobblemon-studio",
   "build": {
     "frontendDist": "../src"
