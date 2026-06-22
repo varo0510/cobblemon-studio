@@ -664,6 +664,25 @@ fn set_unsaved(state: tauri::State<UnsavedFlag>, flag: bool) {
     state.0.store(flag, Ordering::Relaxed);
 }
 
+// "Guardar como…": abre un diálogo nativo y escribe los bytes (base64) en la ruta elegida. Devuelve la ruta o None si se cancela.
+#[tauri::command]
+fn save_export(app: tauri::AppHandle, name: String, b64: String) -> Result<Option<String>, String> {
+    let ext = Path::new(&name).extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let mut dlg = app.dialog().file().set_file_name(name.clone());
+    if !ext.is_empty() { dlg = dlg.add_filter(ext.to_uppercase(), &[ext.as_str()]); }
+    match dlg.blocking_save_file() {
+        Some(fp) => {
+            let path = fp.to_string();
+            let raw = b64.rsplit(',').next().unwrap_or(&b64).trim();
+            let bytes = base64::engine::general_purpose::STANDARD.decode(raw).map_err(|e| e.to_string())?;
+            if bytes.is_empty() { return Err("no hay datos que guardar".into()); }
+            fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+            Ok(Some(path))
+        }
+        None => Ok(None),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -691,7 +710,7 @@ pub fn run() {
             pick_folder, project_create, project_open, pack_info, list_models,
             get_model, write_pack, build_zips, open_folder, update_assets,
             pack_detail, read_pack_file, read_pack_image, delete_file, pack_verify, write_file,
-            check_and_update, restart_app, set_unsaved
+            check_and_update, restart_app, set_unsaved, save_export
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

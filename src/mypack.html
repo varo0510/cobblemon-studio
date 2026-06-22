@@ -1,0 +1,280 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cobblemon Studio — Editar mi pack</title>
+<link rel="stylesheet" href="/studio.css">
+<script>(function(){ if(new URLSearchParams(location.search).get('embed')==='1') document.documentElement.classList.add('embed'); })();</script>
+<script src="/tauri-shim.js"></script>
+<script src="/ctxmenu.js"></script>
+<style>
+  .mp{height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+  .mp-top{flex:0 0 auto;padding:16px 22px 10px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .mp-top h1{margin:0 0 3px;font-size:20px}
+  .mp-top .sub{color:var(--dim);font-size:13px;margin:0}
+  .mp-tools{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .mp-tools input[type=text]{flex:1;min-width:160px;max-width:360px}
+  .mp-body{flex:1;min-height:0;overflow-y:auto;padding:14px 22px 40px}
+  .mp-group{margin-bottom:20px}
+  .mp-gh{display:flex;align-items:center;gap:9px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:700;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .mp-gh .cnt{margin-left:auto;color:var(--dim);font-weight:600;letter-spacing:0;text-transform:none}
+  .mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .mp-card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:9px}
+  .mp-card:hover{border-color:var(--line2)}
+  .mp-card .ttl{font-weight:650;font-size:14px;display:flex;align-items:center;gap:8px;text-transform:capitalize}
+  .mp-card .ttl .ic{font-size:16px}
+  .mp-card .meta{font-size:11.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 10px}
+  .mp-card .files{font-size:10.5px;color:var(--faint);font-family:var(--font-mono)}
+  .mp-card .acts{display:flex;gap:6px;margin-top:2px}
+  .mp-card .acts .btn{flex:1;justify-content:center}
+  .mp-empty{color:var(--dim);text-align:center;margin-top:60px;font-size:14px}
+  .mp-load{display:flex;align-items:center;gap:10px;color:var(--dim);justify-content:center;margin-top:60px}
+  .badge{display:inline-block;padding:1px 7px;border-radius:20px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font-size:10.5px;font-weight:600}
+  .badge.beta{background:color-mix(in srgb,#e3a93a 18%,transparent);color:#e3a93a}
+  /* panel de edición de un caso */
+  .ed-ov{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:5vh 18px;overflow:auto}
+  .ed-ov.open{display:flex}
+  .ed-panel{width:100%;max-width:620px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 18px 54px rgba(0,0,0,.5);overflow:hidden}
+  .ed-head{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .ed-head .ic{font-size:20px}.ed-head h2{margin:0;font-size:17px;text-transform:capitalize}
+  .ed-head .x{margin-left:auto;cursor:pointer;color:var(--faint);font-size:16px}
+  .ed-bd{padding:14px 18px 18px;max-height:72vh;overflow:auto}
+  .ed-sec{margin-bottom:16px}
+  .ed-sec h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin:0 0 8px;font-weight:700}
+  .ed-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);margin-bottom:5px}
+  .ed-row .nm{flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ed-row .nm .pth{display:block;font-size:10px;color:var(--faint);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis}
+  .ed-row .btn{flex:0 0 auto}
+  .ed-add{display:flex;flex-wrap:wrap;gap:6px}
+  .ed-add .btn{flex:0 0 auto}
+  .ed-note{color:var(--dim);font-size:11.5px;margin:4px 0 0}
+  /* editor por campos */
+  .fld-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+  .fld-row label{flex:0 0 150px;font-size:12px;color:var(--dim);text-align:right;overflow:hidden;text-overflow:ellipsis}
+  .fld-row input,.fld-row select{flex:1;min-width:0}
+  .fld-row input[type=checkbox]{flex:0 0 auto}
+  .fld-group{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0}
+  .fld-group .gl{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+  .fld-adv{font-size:11px;color:var(--faint);font-style:italic;margin:6px 0 0}
+  .ed-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+  /* avisos del verificador */
+  .ed-warn{background:color-mix(in srgb,#e3a93a 14%,transparent);border:1px solid color-mix(in srgb,#e3a93a 40%,var(--line));border-radius:8px;padding:7px 10px;font-size:12px;margin-bottom:5px}
+  .ed-warn.err{background:color-mix(in srgb,var(--err) 14%,transparent);border-color:color-mix(in srgb,var(--err) 45%,var(--line))}
+  .warnbadge{background:color-mix(in srgb,#e3a93a 22%,transparent);color:#e3a93a;border-radius:20px;padding:1px 7px;font-size:10.5px;font-weight:700;margin-left:6px}
+</style></head>
+<body>
+<div class="mp">
+  <div class="mp-top">
+    <h1>✏️ Editar mi pack</h1>
+    <p class="sub">Leo tu pack y agrupo los archivos en <b>casos</b> (un Pokémon, una forma regional, una baya…). Pulsa para editarlos.</p>
+    <div class="mp-tools">
+      <input type="text" id="q" placeholder="🔍 Buscar por nombre…" oninput="render()">
+      <button class="btn small" onclick="scan()">↻ Reescanear</button>
+      <span class="sub" id="count"></span>
+    </div>
+  </div>
+  <div class="mp-body" id="body"><div class="mp-load"><span class="spinner"></span>Leyendo tu pack…</div></div>
+</div>
+<div class="ed-ov" id="editOv"><div class="ed-panel">
+  <div class="ed-head"><span class="ic" id="edIc">✏️</span><h2 id="edTitle"></h2><span class="x" onclick="closeEdit()" title="Cerrar">✕</span></div>
+  <div class="ed-bd" id="edBody"></div>
+</div></div>
+<div class="ed-ov" id="fieldOv"><div class="ed-panel">
+  <div class="ed-head"><span class="ic">✏️</span><h2 id="fldTitle">Editar campos</h2><span class="x" onclick="closeFields()" title="Cerrar">✕</span></div>
+  <div class="ed-bd" id="fldBody"></div>
+  <div class="ed-foot"><button class="btn small" onclick="closeFields()">Cancelar</button><button class="btn small primary" onclick="saveFields()">💾 Guardar cambios</button></div>
+</div></div>
+<input type="file" id="repInput" style="display:none" onchange="onReplace(this)">
+<div id="toaster"></div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const PROJECT=(()=>{ try{ return JSON.parse(localStorage.getItem('cs_current')||'null'); }catch(e){ return null; } })();
+async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+function P(){ try{ return (window.parent&&window.parent!==window)?window.parent:null; }catch(e){ return null; } }
+function toast(msg,type){ const h=$('toaster'); if(!h)return; const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg; h.appendChild(t); const c=()=>{ if(!t.parentNode)return; t.classList.add('out'); setTimeout(()=>t.parentNode&&t.parentNode.removeChild(t),300); }; const tm=setTimeout(c,3500); t.onclick=()=>{clearTimeout(tm);c();}; }
+
+// tipos de caso: metadatos de UI + si tienen edición por asistente (intuitiva)
+const TYPES={
+  pokemon:  {label:'Pokémon nuevos', icon:'🐲', intuitive:false},
+  regional: {label:'Formas regionales / variantes', icon:'🧬', intuitive:true},
+  reskin:   {label:'Reskins / aspectos', icon:'🎨', intuitive:true},
+  cosmetic: {label:'Cosméticos', icon:'🎩', intuitive:true},
+  spawn:    {label:'Apariciones (spawns)', icon:'🌿', intuitive:true},
+  dexEntry: {label:'Entradas de Pokédex', icon:'📄', intuitive:true},
+  berry:    {label:'Bayas', icon:'🍒', intuitive:true},
+  mark:     {label:'Marcas', icon:'🎖️', intuitive:true},
+};
+const ORDER=['pokemon','regional','reskin','cosmetic','spawn','dexEntry','berry','mark'];
+let entities=[], PD=null, RES=[];
+
+async function scan(){
+  const body=$('body');
+  if(!PROJECT||!PROJECT.root){ body.innerHTML='<div class="mp-empty">No hay ningún pack abierto.<br>Abre o crea un pack desde el Inicio.</div>'; return; }
+  body.innerHTML='<div class="mp-load"><span class="spinner"></span>Leyendo tu pack…</div>';
+  entities=[];
+  try{
+    const det=await csInvoke('pack_detail',{path:PROJECT.root}); PD=det;
+    const dp=(det.groups&&det.groups.datapack)||{}, rs=(det.groups&&det.groups.resource)||{};
+    const readJ=async rel=>{ try{ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel}); return r&&r.text?JSON.parse(r.text):null; }catch(e){ console.warn('JSON inválido en',rel,e); return null; } };
+    // mapa de textos (lang) fusionado: para recuperar título/descr de marcas, etc.
+    const langMap={}; for(const f of (rs.lang||[])){ const j=await readJ(f.rel); if(j&&typeof j==='object') for(const k in j){ if(!(k in langMap)) langMap[k]=j[k]; } }
+    const resolverFolder=rel=>{ const a=rel.split('/resolvers/')[1]; if(!a) return ''; const parts=a.split('/'); parts.pop(); return parts.join('/'); };
+
+    // --- precarga de resolvers (para recuperar carpeta/textura de formas y reskins) ---
+    const resolvers=[];
+    for(const f of (rs.resolvers||[])){ const j=await readJ(f.rel); if(j) resolvers.push({rel:f.rel, j, folder:resolverFolder(f.rel)}); }
+    RES=resolvers;
+    const findResolver=(sp,aspect)=>resolvers.find(r=>{ const rsp=((r.j.species||'').split(':').pop()||'').toLowerCase(); if(rsp!==sp.toLowerCase()) return false; return (r.j.variations||[]).some(v=>(v.aspects||[]).some(a=>a===aspect||a.startsWith(aspect+'-'))); });
+
+    // --- Pokémon nuevos (species) ---
+    for(const f of (dp.species||[])){ const j=await readJ(f.rel); if(j) entities.push({type:'pokemon', title:(j.name||f.name), sub:[j.primaryType,j.secondaryType].filter(Boolean).join('/'), files:[f.rel], data:{species:j}}); }
+
+    // --- Formas regionales / variantes (species_additions con forms) ---
+    const claimed=new Set();
+    for(const f of (dp.additions||[])){ const j=await readJ(f.rel); if(!j||!Array.isArray(j.forms)||!j.forms.length) continue;
+      const sp=((j.target||'').split(':').pop()||'').toLowerCase(); const fm=j.forms[0];
+      const aspect=Array.isArray(fm.aspects)?fm.aspects[0]:(fm.aspects||''); if(sp&&aspect) claimed.add(sp+'|'+aspect);
+      const res=aspect?findResolver(sp,aspect):null; const folder=res?res.folder:'';
+      entities.push({type:'regional', title:sp+' · '+(fm.name||aspect), sub:[fm.primaryType,fm.secondaryType].filter(Boolean).join('/')||'forma', files:[f.rel].concat(res?[res.rel]:[]), data:{addition:j, sp, aspect, form:fm, folder, target:j.target||('cobblemon:'+sp)}}); }
+
+    // --- Cosméticos (cosmetic_items) ---
+    for(const f of (dp.cosmetic||[])){ const j=await readJ(f.rel); if(!j) continue; const sp=(j.pokemon||[])[0]||''; const spn=(sp.split(':').pop()||sp); const items=j.cosmeticItems||[];
+      if(!items.length){ entities.push({type:'cosmetic', title:f.name, sub:spn, files:[f.rel], data:{cos:j, idx:0}}); continue; }
+      items.forEach((ci,idx)=>{ const aspect=(ci.aspects||[])[0]||''; if(spn&&aspect) claimed.add(spn.toLowerCase()+'|'+aspect);
+        entities.push({type:'cosmetic', title:f.name+(items.length>1?(' · '+(ci.consumedItem||'').split(':').pop()):''), sub:spn+(ci.consumedItem?(' · '+ci.consumedItem.split(':').pop()):''), files:[f.rel], data:{cos:j, idx}}); }); }
+
+    // --- Reskins / aspectos (resolver override con textura+aspecto, no reclamados por forma/cosmético) ---
+    for(const r of resolvers){ const sp=((r.j.species||'').split(':').pop()||'').toLowerCase(); if(!sp) continue;
+      for(const v of (r.j.variations||[])){ const aspect=(v.aspects||[])[0]; if(!aspect) continue; if(!v.texture && !v.model) continue; if(claimed.has(sp+'|'+aspect)) continue;
+        entities.push({type:'reskin', title:sp+' · '+aspect, sub:'aspecto', files:[r.rel], data:{target:r.j.species, sp, aspect, folder:r.folder, texture:v.texture}}); break; } }
+
+    // --- Spawns ---
+    for(const f of (dp.spawns||[])){ const j=await readJ(f.rel); if(!j||!Array.isArray(j.spawns)) continue; j.spawns.forEach((s,i)=>{ entities.push({type:'spawn', title:(s.pokemon||f.name)+(s.bucket?(' · '+s.bucket):''), sub:(s.level||''), files:[f.rel], data:{file:f.rel, spawn:s, idx:i}}); }); }
+
+    // --- Entradas de Pokédex ---
+    for(const f of (dp.dexentries||[])){ const j=await readJ(f.rel); if(!j) continue; const reg=(f.rel.match(/dex_entries\/pokemon\/([^/]+)\//)||[])[1]||'';
+      entities.push({type:'dexEntry', title:(j.speciesId||f.name).split(':').pop(), sub:reg||'dex', files:[f.rel], data:{entry:j, region:reg}}); }
+
+    // --- Bayas ---
+    for(const f of (dp.berries||[])){ const j=await readJ(f.rel); if(!j) continue; entities.push({type:'berry', title:f.name, sub:(j.colour||'').toLowerCase(), files:[f.rel], data:{berry:j, name:f.name}}); }
+
+    // --- Marcas ---
+    for(const f of (dp.marks||[])){ const j=await readJ(f.rel); if(!j) continue; const ns=(j.texture||'').split(':')[0]||'cobblemon';
+      entities.push({type:'mark', title:f.name, sub:'#'+(j.indexNumber!=null?j.indexNumber:'?'), files:[f.rel], data:{mark:j, name:f.name, ns, title:langMap['cobblemon.mark.'+f.name+'.title']||'', descText:langMap['cobblemon.mark.'+f.name+'.desc']||''}}); }
+
+    // verificador: adjunta avisos por archivo a cada caso
+    try{ const ver=await csInvoke('pack_verify',{path:PROJECT.root}); const issues=(ver&&ver.issues)||[]; const norm=s=>String(s||'').replace(/\\/g,'/').toLowerCase(); const byFile={}; issues.forEach(is=>{ const k=norm(is.file); (byFile[k]=byFile[k]||[]).push(is); }); entities.forEach(e=>{ e.issues=[]; (e.files||[]).forEach(f=>{ const k=norm(f); if(byFile[k]) e.issues.push.apply(e.issues, byFile[k]); }); }); }catch(e){}
+    render();
+  }catch(e){ body.innerHTML='<div class="mp-empty">No pude leer el pack: '+e.message+'</div>'; }
+}
+
+function render(){
+  const body=$('body'); const q=($('q').value||'').toLowerCase().trim();
+  const list=entities.filter(e=>!q||(e.title+' '+(e.sub||'')).toLowerCase().includes(q));
+  $('count').textContent=entities.length?(entities.length+' casos'):'';
+  if(!entities.length){ body.innerHTML='<div class="mp-empty">No detecté contenido editable en tu pack todavía.<br><span class="sub">Crea algo con los asistentes y volverá a aparecer aquí.</span></div>'; return; }
+  if(!list.length){ body.innerHTML='<div class="mp-empty">Sin resultados para «'+q+'».</div>'; return; }
+  let html='';
+  for(const type of ORDER){ const items=list.filter(e=>e.type===type); if(!items.length) continue; const T=TYPES[type];
+    html+='<div class="mp-group"><div class="mp-gh"><span>'+T.icon+' '+T.label+'</span>'+(T.intuitive?'<span class="badge">edición guiada</span>':'<span class="badge beta">edición por archivos</span>')+'<span class="cnt">'+items.length+'</span></div><div class="mp-grid">';
+    items.forEach((e,i)=>{ const gi=entities.indexOf(e);
+      html+='<div class="mp-card"><div class="ttl"><span class="ic">'+T.icon+'</span>'+esc(e.title)+(e.issues&&e.issues.length?'<span class="warnbadge" title="'+esc(e.issues.map(x=>x.msg).join(' · '))+'">⚠ '+e.issues.length+'</span>':'')+'</div>'+
+        (e.sub?'<div class="meta"><span>'+esc(e.sub)+'</span></div>':'')+
+        '<div class="files">'+e.files.length+' archivo(s)</div>'+
+        '<div class="acts"><button class="btn small primary" onclick="openEdit('+gi+')">✏️ Editar</button></div></div>';
+    });
+    html+='</div></div>';
+  }
+  body.innerHTML=html;
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ===== panel de edición de un caso (datos + diseño + añadir) =====
+let curEnt=null, panelAssets=[], repTarget=null;
+function assetRel(ref){ if(!ref||ref.indexOf(':')<0) return null; const i=ref.indexOf(':'); return 'assets/'+ref.slice(0,i)+'/'+ref.slice(i+1); }
+function findAssetByName(list,name){ if(!name) return null; const base=String(name).split(/[/:]/).pop().toLowerCase().replace(/\.geo$/,''); let h=list.find(f=>f.rel.split('/').pop().replace(/\.geo\.json$|\.animation\.json$|\.json$/i,'').toLowerCase()===base); if(!h) h=list.find(f=>f.rel.toLowerCase().includes('/'+base+'.')); return h?h.rel:null; }
+function gatherAssets(e){ const tex=new Set(),mdl=new Set(),anm=new Set(); const R=(PD&&PD.groups&&PD.groups.resource)||{}; const models=R.models||[],anims=R.anims||[];
+  const useVar=v=>{ if(v.texture){ const r=assetRel(v.texture); if(r) tex.add(r);} (v.layers||[]).forEach(ly=>{ if(ly&&ly.texture){ const r=assetRel(ly.texture); if(r) tex.add(r);} }); if(v.model){ const r=findAssetByName(models,v.model); if(r) mdl.add(r);} if(v.poser){ const r=findAssetByName(anims,v.poser); if(r) anm.add(r);} };
+  const sp=(e.data.sp||(e.data.species&&(e.data.species.name))||'').toString().toLowerCase();
+  if(e.type==='pokemon'){ RES.filter(r=>((r.j.species||'').split(':').pop()||'').toLowerCase()===sp).forEach(r=>(r.j.variations||[]).forEach(useVar)); }
+  else if(e.type==='regional'||e.type==='reskin'){ const asp=e.data.aspect; RES.forEach(r=>{ if(((r.j.species||'').split(':').pop()||'').toLowerCase()!==sp) return; (r.j.variations||[]).forEach(v=>{ if((v.aspects||[]).some(a=>a===asp||a.startsWith(asp+'-'))) useVar(v); }); }); }
+  // tambien cualquier archivo de assets ya asociado a la entidad
+  (e.files||[]).filter(f=>/\.png$/i.test(f)).forEach(f=>tex.add(f));
+  return { textures:[...tex], models:[...mdl], anims:[...anm] }; }
+function speciesOf(e){ const d=e.data||{}; if(d.sp) return d.sp; if(d.species&&d.species.name) return String(d.species.name).toLowerCase(); if(d.spawn&&d.spawn.pokemon) return String(d.spawn.pokemon).split(':').pop(); if(d.entry&&d.entry.speciesId) return String(d.entry.speciesId).split(':').pop(); if(d.cos&&(d.cos.pokemon||[])[0]) return String(d.cos.pokemon[0]).split(':').pop(); return ''; }
+function openEdit(i){ const e=entities[i]; if(!e) return; curEnt=e; const T=TYPES[e.type];
+  $('edIc').textContent=T.icon; $('edTitle').textContent=e.title;
+  const A=gatherAssets(e); panelAssets=[];
+  const dataFiles=(e.files||[]).filter(f=>f.startsWith('data/'));
+  const fileRow=(rel,label,actions)=>{ const idx=panelAssets.push(rel)-1; const nm=rel.split('/').pop(); return '<div class="ed-row"><span class="nm">'+esc(label||nm)+'<span class="pth">'+esc(rel)+'</span></span>'+actions(idx)+'</div>'; };
+  const viewBtn=idx=>'<button class="btn small" onclick="viewAsset('+idx+')">Ver</button>';
+  const repBtn=idx=>'<button class="btn small" onclick="startReplace('+idx+')">Reemplazar</button>';
+  const fldBtn=idx=>'<button class="btn small" onclick="fieldsAsset('+idx+')">Campos</button>';
+  let html='';
+  // 0) avisos del verificador
+  if(e.issues&&e.issues.length){ html+='<div class="ed-sec"><h3>Avisos</h3>'+e.issues.map(is=>'<div class="ed-warn'+(is.level==='error'?' err':'')+'">'+(is.level==='error'?'⛔ ':'⚠ ')+esc(is.msg)+'</div>').join('')+'</div>'; }
+  // 1) edición guiada de datos
+  if(T.intuitive){ html+='<div class="ed-sec"><h3>Editar datos</h3><button class="btn primary" onclick="guided()">✏️ Abrir editor guiado (asistente)</button><p class="ed-note">Abre el asistente con todo relleno; al guardar, sobrescribe.</p></div>'; }
+  // 2) archivos de datos (JSON) — editar por campos o ver crudo
+  if(dataFiles.length){ html+='<div class="ed-sec"><h3>Archivos de datos</h3>'+dataFiles.map(rel=>fileRow(rel,null,idx=>fldBtn(idx)+viewBtn(idx))).join('')+'</div>'; }
+  // 3) diseño / resource pack
+  let dz='';
+  if(A.textures.length) dz+='<div style="margin-bottom:4px;color:var(--dim);font-size:11px">Texturas</div>'+A.textures.map(rel=>fileRow(rel,null,idx=>viewBtn(idx)+repBtn(idx))).join('');
+  if(A.models.length) dz+='<div style="margin:6px 0 4px;color:var(--dim);font-size:11px">Modelos (.geo)</div>'+A.models.map(rel=>fileRow(rel,null,idx=>viewBtn(idx)+repBtn(idx))).join('');
+  if(A.anims.length) dz+='<div style="margin:6px 0 4px;color:var(--dim);font-size:11px">Animaciones</div>'+A.anims.map(rel=>fileRow(rel,null,idx=>viewBtn(idx)+repBtn(idx))).join('');
+  html+='<div class="ed-sec"><h3>Diseño · Resource pack</h3>'+(dz||'<p class="ed-note">No detecté texturas/modelos para este caso.</p>')+'</div>';
+  // 4) añadir cosas (asistentes pre-apuntados a la especie)
+  const sp=speciesOf(e);
+  if(sp){ const ns='cobblemon:'+sp; html+='<div class="ed-sec"><h3>Añadir a «'+esc(sp)+'»</h3><div class="ed-add">'+
+    '<button class="btn small" onclick="add(\'aparezca\',\'.ws-mon\',\''+esc(sp)+'\')">🌿 Aparición</button>'+
+    '<button class="btn small" onclick="add(\'pokedex\',\'.e-species\',\''+ns+'\')">📄 Pokédex</button>'+
+    '<button class="btn small" onclick="add(\'variante\',\'.g-target\',\''+ns+'\')">🧬 Forma regional</button>'+
+    '<button class="btn small" onclick="add(\'aspecto\',\'.k-target\',\''+ns+'\')">🎨 Reskin/aspecto</button>'+
+    '<button class="btn small" onclick="add(\'complemento\',\'.wc-target\',\''+ns+'\')">🎩 Cosmético</button>'+
+    '</div></div>'; }
+  $('edBody').innerHTML=html; $('editOv').classList.add('open');
+}
+function closeEdit(){ $('editOv').classList.remove('open'); curEnt=null; }
+function guided(){ const e=curEnt; closeEdit(); const p=P(); if(p&&p.csEditEntity) p.csEditEntity(e.type,e); else toast('No disponible','err'); }
+function add(assistId,sel,val){ closeEdit(); const p=P(); if(p&&p.csOpenAssist) p.csOpenAssist(assistId,{[sel]:val}); else toast('No disponible','err'); }
+function viewAsset(idx){ const rel=panelAssets[idx]; if(!rel) return; const p=P(); if(p&&p.csEditFiles) p.csEditFiles([rel]); }
+function startReplace(idx){ repTarget=panelAssets[idx]||null; if(!repTarget) return; $('repInput').value=''; $('repInput').click(); }
+function fileB64(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).replace(/^data:[^,]+,/,'')); r.onerror=()=>res(null); r.readAsDataURL(file); }); }
+async function onReplace(input){ const f=input.files&&input.files[0]; if(!f||!repTarget) return; const rel=repTarget; repTarget=null;
+  try{ const isImg=/\.(png|jpe?g|webp)$/i.test(f.name)||/\.png$/i.test(rel);
+    if(isImg){ const b64=await fileB64(f); if(!b64){ toast('No pude leer la imagen','err'); return; } const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:{mode:'existing',path:PROJECT.root},overwrite:true,items:[],rawFiles:[{rel,base64:b64}]})}).then(r=>r.json()).catch(e=>({error:e.message})); if(r.error) toast('Error: '+r.error,'err'); else toast('Textura reemplazada ✓','ok'); }
+    else { const text=await f.text(); const r=await fetch('/api/writefile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:PROJECT.root,rel,text})}).then(r=>r.json()).catch(e=>({error:e.message})); if(r&&r.error) toast('Error: '+r.error,'err'); else toast('Archivo reemplazado ✓','ok'); }
+  }catch(e){ toast('Error: '+e.message,'err'); } }
+
+// ===== editor por campos (edita el JSON en su sitio, sin regenerar nada) =====
+const FLD_LABELS={ name:'Nombre', primaryType:'Tipo 1', secondaryType:'Tipo 2', catchRate:'Captura', baseScale:'Escala', baseExperienceYield:'Exp. base', baseFriendship:'Amistad', experienceGroup:'Curva exp.', maleRatio:'Ratio ♂', eggCycles:'Ciclos huevo', eggGroups:'Grupos huevo', abilities:'Habilidades', moves:'Movimientos', labels:'Etiquetas', nationalPokedexNumber:'Nº Pokédex', baseStats:'Estadísticas base', hp:'PS', attack:'Ataque', defence:'Defensa', special_attack:'At. Esp.', special_defence:'Def. Esp.', speed:'Velocidad', colour:'Color', weight:'Peso', indexNumber:'Nº índice', chance:'Probabilidad', titleColor:'Color título', texture:'Textura', speciesId:'Especie', pokemon:'Pokémon', bucket:'Rareza', level:'Nivel', implemented:'Implementado', preferredBiomeTags:'Biomas preferidos' };
+function fLabel(k){ return FLD_LABELS[k]||k; }
+let fieldRel=null, fieldObj=null;
+function fieldsAsset(idx){ const rel=panelAssets[idx]; if(rel) openFields(rel); }
+async function openFields(rel){ const j=await readJ(rel); if(j==null){ fieldRel=null; fieldObj=null; toast('No pude leer el archivo (¿JSON inválido?)','err'); return; } fieldRel=rel; fieldObj=j; $('fldTitle').textContent='Editar campos · '+rel.split('/').pop(); renderFields(); $('fieldOv').classList.add('open'); }
+function closeFields(){ $('fieldOv').classList.remove('open'); fieldRel=null; fieldObj=null; }
+function isScalar(v){ return v==null||typeof v==='string'||typeof v==='number'||typeof v==='boolean'; }
+function allScalar(o){ return o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).length&&Object.values(o).every(isScalar); }
+function scalarArr(a){ return Array.isArray(a)&&a.every(isScalar); }
+function inputFor(path,v){ if(typeof v==='boolean') return '<input type="checkbox" data-path="'+path+'" data-t="b"'+(v?' checked':'')+'>'; if(typeof v==='number') return '<input type="number" step="any" data-path="'+path+'" data-t="n" value="'+esc(v)+'">'; return '<input type="text" data-path="'+path+'" data-t="s" value="'+esc(v==null?'':v)+'">'; }
+function renderFields(){ const o=fieldObj||{}; let h=''; const adv=[];
+  for(const k in o){ const v=o[k];
+    if(isScalar(v)) h+='<div class="fld-row"><label title="'+esc(k)+'">'+esc(fLabel(k))+'</label>'+inputFor(k,v)+'</div>';
+    else if(scalarArr(v)) h+='<div class="fld-row"><label title="'+esc(k)+'">'+esc(fLabel(k))+'</label><input type="text" data-path="'+k+'" data-t="as" data-at="'+(v.length&&v.every(x=>typeof x==='number')?'n':'s')+'" value="'+esc(v.join(', '))+'"></div>';
+    else if(allScalar(v)){ h+='<div class="fld-group"><div class="gl">'+esc(fLabel(k))+'</div>'; for(const sk in v) h+='<div class="fld-row"><label title="'+esc(sk)+'">'+esc(fLabel(sk))+'</label>'+inputFor(k+'.'+sk,v[sk])+'</div>'; h+='</div>'; }
+    else adv.push(k);
+  }
+  if(adv.length) h+='<div class="fld-adv">Campos avanzados (se conservan tal cual; edítalos con «Ver» en JSON): '+adv.map(esc).join(', ')+'</div>';
+  $('fldBody').innerHTML=h||'<p class="ed-note">Sin campos editables.</p>';
+}
+function setByPath(o,path,val){ const ps=path.split('.'); let t=o; for(let i=0;i<ps.length-1;i++){ if(t[ps[i]]==null||typeof t[ps[i]]!=='object') t[ps[i]]={}; t=t[ps[i]]; } t[ps[ps.length-1]]=val; }
+async function saveFields(){ if(!fieldObj||!fieldRel) return; const clone=JSON.parse(JSON.stringify(fieldObj));
+  $('fldBody').querySelectorAll('[data-path]').forEach(el=>{ const p=el.dataset.path,t=el.dataset.t; let val; if(t==='b') val=el.checked; else if(t==='n'){ val=el.value===''?null:Number(el.value); if(val!=null&&isNaN(val)) val=0; } else if(t==='as'){ val=el.value.split(',').map(s=>s.trim()).filter(Boolean); if(el.dataset.at==='n') val=val.map(Number); } else val=el.value; setByPath(clone,p,val); });
+  const r=await fetch('/api/writefile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:PROJECT.root,rel:fieldRel,text:JSON.stringify(clone,null,2)+'\n'})}).then(r=>r.json()).catch(e=>({error:e.message}));
+  if(r&&r.error) toast('Error: '+r.error,'err'); else { toast('Guardado ✓','ok'); closeFields(); }
+}
+
+if(window.ctxMenu){ ctxMenu.fallback(()=>[ {icon:'↻',label:'Reescanear',action:scan} ]); }
+scan();
+</script>
+</body></html>

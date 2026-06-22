@@ -63,7 +63,7 @@
     var ro=isInput && (el.readOnly||el.disabled);
     function copy(){ el.focus(); if(isInput){ var s=el.value.substring(el.selectionStart,el.selectionEnd); if(s) writeClip(s); } else { try{document.execCommand('copy');}catch(e){} } }
     function cut(){ if(ro) return; el.focus(); if(isInput){ var a=el.selectionStart,b=el.selectionEnd,s=el.value.substring(a,b); if(s){ writeClip(s); el.setRangeText('',a,b,'end'); el.dispatchEvent(new Event('input',{bubbles:true})); } } else { try{document.execCommand('cut');}catch(e){} } }
-    function paste(){ if(ro) return; el.focus(); readClip().then(function(txt){ if(!txt) return; if(isInput){ var a=el.selectionStart,b=el.selectionEnd; el.setRangeText(txt,a,b,'end'); el.dispatchEvent(new Event('input',{bubbles:true})); } else { try{document.execCommand('insertText',false,txt);}catch(e){} } }); }
+    function paste(){ if(ro) return; el.focus(); readClip().then(function(txt){ if(!txt){ try{ document.execCommand('paste'); }catch(e){} return; } if(isInput){ var a=el.selectionStart,b=el.selectionEnd; el.setRangeText(txt,a,b,'end'); el.dispatchEvent(new Event('input',{bubbles:true})); } else { try{document.execCommand('insertText',false,txt);}catch(e){} } }); }
     function selectAll(){ el.focus(); if(isInput) el.select(); else { try{document.execCommand('selectAll');}catch(e){} } }
     return [
       {icon:'✂',label:'Cortar',hint:'Ctrl+X',disabled:ro||!hasSel,action:cut},

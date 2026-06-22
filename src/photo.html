@@ -1,0 +1,489 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cobblemon Studio — Modo foto</title>
+<link rel="stylesheet" href="/studio.css">
+<script>
+(function(){ if(new URLSearchParams(location.search).get('embed')==='1') document.documentElement.classList.add('embed'); })();
+</script>
+<script src="/tauri-shim.js"></script>
+<script src="/vendor/three.min.js"></script>
+<script src="/vendor/OrbitControls.js"></script>
+<script src="/geo-three-reference.js"></script>
+<script src="/anim-bedrock.js"></script>
+<script src="/vendor/gif-encoder.js"></script>
+<script src="/ctxmenu.js"></script>
+<style>
+  .ph{display:grid;grid-template-columns:248px 1fr 296px;height:100vh}
+  .ph-side{background:var(--panel);overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .ph-right{padding:10px;gap:6px}
+  /* secciones plegables (acordeón) */
+  .acc{border:1px solid var(--line);border-radius:10px;background:var(--panel2);overflow:hidden}
+  .acc-h{display:flex;align-items:center;gap:8px;padding:10px 11px;cursor:pointer;user-select:none;font-size:12px;font-weight:700;color:var(--text)}
+  .acc-h:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .acc-h .ico{font-size:14px}
+  .acc-h .chev{margin-left:auto;width:11px;height:11px;opacity:.55;transition:transform .18s;flex:0 0 auto}
+  .acc.collapsed .acc-h .chev{transform:rotate(-90deg)}
+  .acc-b{padding:2px 11px 12px}
+  .acc.collapsed .acc-b{display:none}
+  .sline{display:flex;align-items:center;gap:8px}
+  .sline input[type=range]{flex:1}
+  .sline .sv{width:46px;text-align:right;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .ph-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;color:var(--dim);pointer-events:none}
+  .ph-empty .big{font-size:48px;opacity:.45}
+  .ph-empty h2{margin:0;font-size:18px;color:var(--text);font-weight:650}
+  .ph-empty p{margin:0;font-size:13px;max-width:260px;line-height:1.5}
+  .ph-empty .btn{pointer-events:auto;margin-top:2px}
+  .ph-left{border-right:1px solid var(--line)}
+  .ph-right{border-left:1px solid var(--line)}
+  .ph-center{position:relative;min-width:0;background:#0c0e12;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  #c{width:100%;height:100%;display:block}
+  .ph-h{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:700;margin:2px 0 2px}
+  .pl{display:block;font-size:11px;color:var(--dim);margin:8px 0 3px}
+  .muted{color:var(--faint);font-size:12px}
+  .ph-side input[type=range]{width:100%}
+  .ph-side input[type=text],.ph-side select{width:100%}
+  .row2{display:flex;gap:6px;align-items:center}
+  .actor-row{display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:8px;background:var(--panel2);border:1px solid transparent;cursor:pointer;font-size:13px;margin-bottom:4px}
+  .actor-row:hover{border-color:var(--line2)}
+  .actor-row.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel2))}
+  .actor-row .an{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:capitalize}
+  .actor-row .ax{color:var(--faint);font-weight:700}
+  .actor-row .ax:hover{color:var(--err)}
+  #actorProps{border-top:1px solid var(--line);padding-top:8px}
+  .ph-hud{position:absolute;left:12px;bottom:10px;font-size:12px;color:#cfd6e0;background:rgba(0,0,0,.5);padding:5px 9px;border-radius:8px;pointer-events:none}
+  .ph-vptools{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+  .bgmodes{display:flex;flex-wrap:wrap;gap:5px}
+  .bgmodes .btn{flex:1;min-width:0;justify-content:center;padding:6px 4px;font-size:11.5px}
+  .bgmodes .btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .ph .btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .swrow{display:flex;gap:8px;align-items:center}
+  .swrow input[type=color]{flex:1;height:30px;padding:2px}
+  .qbtns{display:flex;gap:6px}.qbtns .btn{flex:1;justify-content:center}
+  /* pantalla para añadir Pokémon */
+  .ph-overlay{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:6vh 18px}
+  .ph-pick{width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:18px;box-shadow:0 16px 50px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:10px;max-height:80vh}
+  .ph-pick .ph-h{display:flex;justify-content:space-between;align-items:center;margin:0}
+  .ph-pick .ph-h span{cursor:pointer;color:var(--faint);font-size:14px}
+  #pkList{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:4px;display:grid;grid-template-columns:1fr 1fr;gap:2px;flex:1}
+  #pkList .mrow{text-transform:capitalize}
+  #pkList .mrow.full{grid-column:1/-1;text-align:center;color:var(--dim)}
+</style></head>
+<body>
+<div class="ph">
+  <aside class="ph-side ph-left">
+    <div class="ph-h">Escena</div>
+    <button class="btn primary" onclick="openPicker()" style="width:100%">➕ Añadir Pokémon</button>
+    <div id="actorList"></div>
+    <div id="actorProps"></div>
+  </aside>
+
+  <div class="ph-center">
+    <canvas id="c"></canvas>
+    <div class="ph-empty" id="emptyState"><div class="big">📷</div><h2>Estudio de fotos</h2><p>Añade un Pokémon para empezar a montar tu escena, iluminarla y exportarla.</p><button class="btn primary" onclick="openPicker()">➕ Añadir Pokémon</button></div>
+    <div class="ph-vptools">
+      <button class="btn small" onclick="frameAll()" title="Encuadrar la cámara">🎯 Encuadrar</button>
+      <select class="btn small" onchange="camPreset(this.value); this.selectedIndex=0" title="Ángulo de cámara"><option>📷 Ángulo</option><option value="front">Frontal</option><option value="34">¾ (3/4)</option><option value="side">Lateral</option><option value="back">Trasera</option><option value="top">Cenital</option><option value="low">Contrapicado</option></select>
+      <button class="btn small on" id="gridBtn" onclick="toggleGrid()" title="Rejilla del suelo">Rejilla</button>
+      <button class="btn small" id="cycBtn" onclick="toggleCyc(!cycOn)" title="Estudio: suelo y pared (ciclorama)">Estudio</button>
+    </div>
+    <div class="ph-hud" id="hud">Arrastra para orbitar · rueda = zoom · clic en un Pokémon para moverlo</div>
+  </div>
+
+  <aside class="ph-side ph-right">
+    <div class="acc" data-k="luz"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">💡</span>Iluminación<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+      <div class="acc-b">
+        <div class="bgmodes" id="lightPresets">
+          <button class="btn small on" data-lp="studio" onclick="applyLightPreset('studio')">Estudio</button>
+          <button class="btn small" data-lp="retrato" onclick="applyLightPreset('retrato')">Retrato</button>
+          <button class="btn small" data-lp="cine" onclick="applyLightPreset('cine')">Cine</button>
+          <button class="btn small" data-lp="plano" onclick="applyLightPreset('plano')">Plano</button>
+        </div>
+        <label class="pl">Intensidad</label><div class="sline"><input type="range" min="0.3" max="2" step="0.05" value="1" oninput="setLightMul(this.value); $('liV').textContent=(+this.value).toFixed(2)+'×'"><span class="sv" id="liV">1.00×</span></div>
+        <div class="row2" style="margin-top:8px;gap:8px"><span class="muted">Temp.</span><select onchange="setTemp(this.value)" style="flex:1"><option value="neutra">Neutra</option><option value="calida">Cálida</option><option value="fria">Fría</option></select></div>
+        <label class="row2" style="font-size:12px;color:var(--dim);margin-top:8px"><input type="checkbox" id="shBox" checked onchange="toggleShadows(this.checked)"> Sombras</label>
+        <label class="row2" style="font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="toneBox" onchange="setTone(this.checked)"> Color cine (ACES)</label>
+        <div id="expBox" style="display:none"><label class="pl">Exposición</label><div class="sline"><input type="range" id="expRange" min="0.4" max="2.5" step="0.05" value="1" oninput="setExposure(this.value); $('exV').textContent=(+this.value).toFixed(2)"><span class="sv" id="exV">1.00</span></div></div>
+      </div>
+    </div>
+
+    <div class="acc collapsed" data-k="cam"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">🎥</span>Cámara<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+      <div class="acc-b">
+        <div class="row2" style="gap:8px"><span class="muted">Tipo</span><select id="camType" onchange="setCamType(this.value)" style="flex:1"><option value="persp">Perspectiva</option><option value="ortho">Ortográfica</option></select></div>
+        <label class="pl">Campo de visión (FOV)</label><div class="sline"><input type="range" id="fovRange" min="20" max="80" step="1" value="45" oninput="setFOV(this.value); $('fovV').textContent=this.value+'°'"><span class="sv" id="fovV">45°</span></div>
+        <label class="row2" style="font-size:12px;color:var(--dim);margin-top:8px"><input type="checkbox" id="aoBox" onchange="setAutoOrbit(this.checked)"> Giro automático</label>
+      </div>
+    </div>
+
+    <div class="acc" data-k="fondo"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">🌅</span>Fondo y set<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+      <div class="acc-b">
+        <div class="bgmodes" id="bgModes">
+          <button class="btn small on" data-bg="color" onclick="setBgMode('color')">Color</button>
+          <button class="btn small" data-bg="gradient" onclick="setBgMode('gradient')">Degradado</button>
+          <button class="btn small" data-bg="radial" onclick="setBgMode('radial')">Radial</button>
+          <button class="btn small" data-bg="image" onclick="setBgMode('image')">Imagen</button>
+          <button class="btn small" data-bg="transparent" onclick="setBgMode('transparent')">Transp.</button>
+        </div>
+        <label class="pl">Presets rápidos</label>
+        <div class="bgmodes">
+          <button class="btn small" onclick="bgPreset('sky')">Cielo</button>
+          <button class="btn small" onclick="bgPreset('sunset')">Atardecer</button>
+          <button class="btn small" onclick="bgPreset('night')">Noche</button>
+          <button class="btn small" onclick="bgPreset('white')">Blanco</button>
+          <button class="btn small" onclick="bgPreset('grass')">Hierba</button>
+        </div>
+        <div id="bgColorBox"><label class="pl">Color</label><div class="swrow"><input type="color" id="bgColA" value="#1b1f27" oninput="applyBg()"></div></div>
+        <div id="bgGradBox" style="display:none"><label class="pl">Degradado (de arriba a abajo / centro a borde)</label><div class="swrow"><input type="color" id="bgColTop" value="#3a4a7a" oninput="applyBg()"><input type="color" id="bgColBot" value="#0e1014" oninput="applyBg()"></div></div>
+        <div id="bgImgBox" style="display:none">
+          <label class="btn small">🖼️ Subir imagen<input type="file" accept=".png,.jpg,.jpeg,.webp" onchange="onBgImage(this.files[0])"></label>
+          <label class="row2" style="margin-top:8px;font-size:12px;color:var(--dim)"><input type="checkbox" id="bgPano" onchange="applyBg()"> Panorama 3D (360°)</label>
+        </div>
+        <div id="cycColorBox" style="display:none"><label class="pl">Color del estudio (ciclorama)</label><div class="swrow"><input type="color" id="cycColIn" value="#2a2e36" oninput="setCycColor(this.value)"></div></div>
+      </div>
+    </div>
+
+    <div class="acc collapsed" data-k="marca"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">🏷️</span>Marca y texto<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+      <div class="acc-b">
+        <label class="pl">Título</label><input type="text" id="capTitle" placeholder="Nombre del diseño…" style="width:100%">
+        <label class="pl">Subtítulo</label><input type="text" id="capSub" placeholder="autor · detalle…" style="width:100%">
+        <label class="btn small" style="margin-top:8px">🏷️ Logo / marca de agua<input type="file" accept=".png" onchange="onLogo(this.files[0])"></label>
+        <div class="row2" style="margin-top:6px;gap:8px"><span class="muted">Esquina</span><select id="logoCorner" style="flex:1"><option value="br">Abajo dcha.</option><option value="bl">Abajo izq.</option><option value="tr">Arriba dcha.</option><option value="tl">Arriba izq.</option></select></div>
+        <label class="pl">Tamaño logo</label><div class="sline"><input type="range" id="logoSize" min="6" max="40" value="18" oninput="$('lsV').textContent=this.value+'%'"><span class="sv" id="lsV">18%</span></div>
+        <label class="pl">Opacidad logo</label><div class="sline"><input type="range" id="logoOp" min="20" max="100" value="90" oninput="$('loV').textContent=this.value+'%'"><span class="sv" id="loV">90%</span></div>
+        <div class="muted" style="font-size:11px;margin-top:6px">Se incrusta en la Foto PNG, el GIF y la hoja de contacto (no en el WebM).</div>
+      </div>
+    </div>
+
+    <div class="acc" data-k="export"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">📤</span>Exportar<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+      <div class="acc-b">
+        <label class="pl">Formato (relación de aspecto)</label>
+        <select id="aspectSel" onchange="setAspect(this.value)" style="width:100%"><option value="">Libre (rellena el visor)</option><option value="1">Cuadrado 1:1</option><option value="1.7778">Horizontal 16:9</option><option value="0.5625">Vertical 9:16 (móvil)</option><option value="0.8">Retrato 4:5</option><option value="1.5">Foto 3:2</option></select>
+        <label class="pl">Foto PNG (calidad)</label>
+        <div class="qbtns"><button class="btn small" onclick="exportPNG(1)">1×</button><button class="btn small" onclick="exportPNG(2)">2×</button><button class="btn small" onclick="exportPNG(4)">4×</button></div>
+        <label class="pl">Animado (duración)</label>
+        <div class="sline"><input type="range" id="recSecs" min="1" max="20" value="4" oninput="$('rsV').textContent=this.value+'s'"><span class="sv" id="rsV">4s</span></div>
+        <label class="row2" style="font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="recTurn" checked> Giro 360°</label>
+        <div class="row2" style="margin-top:8px;gap:6px"><button class="btn small primary" id="recBtn" onclick="toggleRecord()" style="flex:1">● WebM</button><button class="btn small" id="gifBtn" onclick="exportGIF(+$('recSecs').value||4,$('recTurn').checked)" style="flex:1">🎞️ GIF</button></div>
+        <button class="btn small" onclick="contactSheet()" style="margin-top:8px;width:100%">🗂️ Hoja de contacto</button>
+        <div class="muted" style="margin-top:8px;font-size:11px">WebM = mejor peso/calidad · GIF = compatible en todas partes (más pesado).</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div id="pickerOverlay" class="ph-overlay" style="display:none">
+  <div class="ph-pick">
+    <div class="ph-h">Añadir modelo <span onclick="closePicker()" title="Cerrar">✕</span></div>
+    <div class="bgmodes" id="pkTabs">
+      <button class="btn small on" data-src="repo" onclick="setPickSrc('repo')">Repositorio</button>
+      <button class="btn small" data-src="pack" onclick="setPickSrc('pack')">Mi pack</button>
+    </div>
+    <input type="text" id="pkSearch" placeholder="🔍 Buscar…" oninput="filterPick()">
+    <div id="pkList"><div class="mrow full"><span class="spinner"></span>Cargando…</div></div>
+  </div>
+</div>
+<div id="toaster"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(msg,type){ const host=$('toaster'); if(!host) return; const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg; host.appendChild(t); const close=()=>{ if(!t.parentNode)return; t.classList.add('out'); setTimeout(()=>{ if(t.parentNode) t.parentNode.removeChild(t); },300); }; const tm=setTimeout(close,3500); t.onclick=()=>{ clearTimeout(tm); close(); }; }
+const loadTex=url=>new Promise(res=>{ if(!url) return res(null); new THREE.TextureLoader().load(url,t=>res(t),undefined,()=>res(null)); });
+const PROJECT=(()=>{ try{ return JSON.parse(localStorage.getItem('cs_current')||'null'); }catch(e){ return null; } })();
+async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+function blobToB64(blob){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).replace(/^data:[^,]+,/,'')); r.onerror=()=>res(null); r.readAsDataURL(blob); }); }
+async function saveExport(name,b64){ if(!b64){ toast('No se pudo preparar el archivo','err'); return; } try{ const p=await csInvoke('save_export',{name,b64}); if(p) toast('Guardado en: '+p,'ok'); else toast('Guardado cancelado','info'); }catch(e){ toast('No se pudo guardar: '+e.message,'err'); } }
+
+// ===== escena 3D =====
+const canvas=$('c');
+const scene=new THREE.Scene();
+const PERSP=new THREE.PerspectiveCamera(45,1,0.1,5000); PERSP.position.set(0,24,70);
+const ORTHO=new THREE.OrthographicCamera(-40,40,40,-40,0.1,5000); ORTHO.position.set(0,24,70);
+let camera=PERSP, orthoSize=40;
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const controls=new THREE.OrbitControls(camera,canvas); controls.enableDamping=true;
+// iluminación de 3 puntos (key con sombra + fill + back/rim) + ambiente bajo
+const amb=new THREE.AmbientLight(0xffffff,0.22);
+const key=new THREE.DirectionalLight(0xffffff,1.25); key.position.set(40,80,50); key.castShadow=true;
+key.shadow.mapSize.set(2048,2048); key.shadow.camera.left=-200; key.shadow.camera.right=200; key.shadow.camera.top=200; key.shadow.camera.bottom=-200; key.shadow.camera.near=0.5; key.shadow.camera.far=600; key.shadow.bias=-0.0005; key.shadow.radius=3;
+const fill=new THREE.DirectionalLight(0xffffff,0.45); fill.position.set(-60,20,-30);
+const back=new THREE.DirectionalLight(0xffe6b0,0.6); back.position.set(0,60,-80);
+scene.add(amb,key,fill,back);
+const stage=new THREE.Group(); scene.add(stage);
+// captador de sombra: plano invisible que SOLO muestra la sombra (asienta el modelo aunque el fondo sea transparente)
+const shadowCatcher=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000), new THREE.ShadowMaterial({opacity:0.3})); shadowCatcher.rotation.x=-Math.PI/2; shadowCatcher.receiveShadow=true; scene.add(shadowCatcher);
+let grid=new THREE.GridHelper(200,40,0x3a3026,0x2f261d); scene.add(grid); let gridOn=true;
+let shadowsOn=true, autoOrbit=false, autoSpeed=0.01;
+// ciclorama (suelo + pared trasera del mismo color, look de estudio)
+let cyc=null, cycOn=false, cycColor='#2a2e36';
+function ensureCyc(){ if(cyc) return; cyc=new THREE.Group(); const fl=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600), new THREE.MeshLambertMaterial({color:cycColor})); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; const wl=new THREE.Mesh(new THREE.PlaneGeometry(1600,1000), new THREE.MeshLambertMaterial({color:cycColor})); wl.position.set(0,500,-360); cyc.add(fl,wl); cyc.userData.fl=fl; cyc.userData.wl=wl; scene.add(cyc); }
+function toggleCyc(on){ cycOn=on; ensureCyc(); cyc.visible=on; $('cycBtn')&&$('cycBtn').classList.toggle('on',on); shadowCatcher.visible=shadowsOn&&!on; const cb=$('cycColorBox'); if(cb) cb.style.display=on?'':'none'; }
+function setCycColor(c){ cycColor=c; if(cyc){ cyc.userData.fl.material.color.set(c); cyc.userData.wl.material.color.set(c); } }
+function toggleShadows(on){ shadowsOn=on; key.castShadow=on; shadowCatcher.visible=on&&!cycOn; renderer.shadowMap.needsUpdate=true; }
+// iluminación de 3 puntos + presets + temperatura
+const TEMPS={ neutra:'#ffffff', calida:'#ffd2a1', fria:'#cfe2ff' };
+const LIGHT_PRESETS={
+  studio:{amb:0.22,key:[40,80,50,1.25],fill:[-60,20,-30,0.45],back:[0,60,-80,0.6]},
+  retrato:{amb:0.30,key:[25,55,70,1.05],fill:[-40,25,40,0.5],back:[0,70,-60,0.35]},
+  cine:{amb:0.10,key:[75,50,30,1.55],fill:[-50,20,-20,0.12],back:[-10,60,-80,0.95]},
+  plano:{amb:0.5,key:[20,60,60,0.75],fill:[-20,40,-40,0.7],back:[0,0,0,0]},
+};
+const lightState={preset:'studio',mul:1,temp:'neutra'};
+function applyLights(){ const p=LIGHT_PRESETS[lightState.preset]||LIGHT_PRESETS.studio, m=lightState.mul;
+  amb.intensity=p.amb*m; key.position.set(p.key[0],p.key[1],p.key[2]); key.intensity=p.key[3]*m;
+  fill.position.set(p.fill[0],p.fill[1],p.fill[2]); fill.intensity=p.fill[3]*m;
+  back.position.set(p.back[0],p.back[1],p.back[2]); back.intensity=p.back[3]*m;
+  const c=TEMPS[lightState.temp]||'#ffffff'; key.color.set(c); fill.color.set(c); }
+function applyLightPreset(name){ lightState.preset=name; document.querySelectorAll('#lightPresets .btn').forEach(b=>b.classList.toggle('on',b.dataset.lp===name)); applyLights(); }
+function setLightMul(v){ lightState.mul=+v; applyLights(); }
+function setTemp(v){ lightState.temp=v; applyLights(); }
+
+function updateCamAspect(aspect){ if(camera.isPerspectiveCamera){ camera.aspect=aspect; } else { camera.left=-orthoSize*aspect; camera.right=orthoSize*aspect; camera.top=orthoSize; camera.bottom=-orthoSize; } camera.updateProjectionMatrix(); }
+function resize3(){ if(recording) return; const w=canvas.clientWidth,h=canvas.clientHeight; if(w&&h&&(canvas.width!==w||canvas.height!==h)){ renderer.setSize(w,h,false); updateCamAspect(w/h); } }
+function setCamType(v){ const aspect=(canvas.clientWidth||1)/(canvas.clientHeight||1);
+  if(v==='ortho'){ if(camera.isOrthographicCamera) return; const dist=PERSP.position.distanceTo(controls.target); orthoSize=Math.max(8,Math.tan(PERSP.fov*Math.PI/360)*dist); ORTHO.position.copy(PERSP.position); ORTHO.quaternion.copy(PERSP.quaternion); camera=ORTHO; }
+  else { if(camera.isPerspectiveCamera) return; PERSP.position.copy(ORTHO.position); PERSP.quaternion.copy(ORTHO.quaternion); camera=PERSP; const fr2=$('fovRange'); if(fr2){ fr2.value=PERSP.fov; const fv=$('fovV'); if(fv) fv.textContent=Math.round(PERSP.fov)+'°'; } }
+  controls.object=camera; updateCamAspect(aspect); controls.update(); const fr=$('fovRange'); if(fr) fr.disabled=(v==='ortho'); }
+function setFOV(v){ PERSP.fov=+v; if(camera===PERSP){ PERSP.updateProjectionMatrix(); } }
+function setAutoOrbit(on){ autoOrbit=on; }
+function applyTransform(a){ a.group.position.set(a.t.x,a.t.y,a.t.z); a.group.rotation.set(0,a.t.rotY,0); a.group.scale.setScalar(a.t.scale); }
+let recording=false, turntable=false, recStart=0, recDur=4000, mediaRec=null;
+function loop(){ requestAnimationFrame(loop); resize3(); const now=performance.now();
+  for(const a of actors){ if(a.clip&&window.applyAnimClip){ const t=a.animOn?((now-a.animStart)/1000):(a.frameT||0); window.applyAnimClip(a.model,a.clip,t); } applyTransform(a); }
+  if(autoOrbit&&!recording) stage.rotation.y+=autoSpeed;
+  if(recording&&turntable&&recDur>0) stage.rotation.y=((now-recStart)/recDur)*Math.PI*2;
+  controls.update(); renderer.render(scene,camera); }
+
+function frameAll(){ if(!actors.length) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(stage); if(b.isEmpty()) return; const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16; camera.position.set(c.x+r*0.7, c.y+s.y*0.15+r*0.5, c.z+r*1.8); controls.target.copy(c); controls.update(); if(camera.isOrthographicCamera){ orthoSize=r*0.95; updateCamAspect((canvas.clientWidth||1)/(canvas.clientHeight||1)); } }
+
+// ===== actores (modelos en la escena) =====
+const actors=[]; let sel=-1, actorSeq=0;
+async function buildActor(name, geoJson, textureUrl, animationJson, shinyUrl){
+  const tex=await loadTex(textureUrl); applyTexEncoding(tex);
+  let inner; try{ inner=window.geoToThreeGroup(geoJson,tex); }catch(e){ toast('Modelo inválido: '+e.message,'err'); return; }
+  let mat=null; inner.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; if(!mat) mat=o.material; } });   // sombras + ref al material para shiny
+  inner.updateMatrixWorld(true); const bb=new THREE.Box3().setFromObject(inner),c=bb.getCenter(new THREE.Vector3()); inner.position.set(-c.x,-bb.min.y,-c.z);   // base al suelo y centrado
+  const group=new THREE.Group(); group.add(inner);
+  const animNames=(animationJson&&animationJson.animations)?Object.keys(animationJson.animations):[];
+  const a={ id:++actorSeq, name, model:inner, group, mat, texNormal:tex, texShiny:null, shinyUrl:shinyUrl||null, useShiny:false, animation:animationJson, animNames, clip:null, animOn:true, animStart:performance.now(), frameT:0, t:{x:0,y:0,z:0,rotY:0,scale:1} };
+  if(animNames.length&&window.buildAnimClip) a.clip=window.buildAnimClip(animationJson);
+  const span=Math.max(bb.max.x-bb.min.x,10); a.t.x=actors.length?(actors.length%2?1:-1)*Math.ceil(actors.length/2)*span:0;   // reparte a los lados
+  stage.add(group); actors.push(a); selectActor(actors.length-1); if(actors.length===1) frameAll();
+  toast(name+' añadido','ok');
+}
+async function addActor(m){ toast('Cargando '+m.name+'…','info');
+  const r=await fetch('/api/preview/model?geo='+encodeURIComponent(m.geo)).then(r=>r.json()).catch(()=>({error:'no se pudo cargar'}));
+  if(r.error){ toast('Error: '+r.error,'err'); return; }
+  await buildActor(m.name, r.geo, r.texture, r.animation, r.shiny||null);
+}
+async function toggleShiny(){ const a=actors[sel]; if(!a) return; if(!a.shinyUrl){ toast('Este modelo no tiene textura shiny','info'); return; }
+  a.useShiny=!a.useShiny;
+  if(a.useShiny && !a.texShiny){ a.texShiny=await loadTex(a.shinyUrl); if(a.texShiny){ a.texShiny.magFilter=THREE.NearestFilter; a.texShiny.minFilter=THREE.NearestFilter; a.texShiny.generateMipmaps=false; a.texShiny.flipY=true; a.texShiny.needsUpdate=true; } }
+  if(a.mat){ a.mat.map = a.useShiny ? (a.texShiny||a.texNormal) : a.texNormal; a.mat.needsUpdate=true; }
+  renderActorProps(); }
+async function addPackActor(m){ if(!PROJECT||!PROJECT.root) return; toast('Cargando '+m.label+'…','info');
+  try{
+    const gf=await csInvoke('read_pack_file',{path:PROJECT.root, rel:m.rel}); if(!gf||gf.error||!gf.text){ toast('No se pudo leer el modelo del pack','err'); return; }
+    const geo=JSON.parse(gf.text);
+    let texUrl=null; if(m.texRel){ const im=await csInvoke('read_pack_image',{path:PROJECT.root, rel:m.texRel}); if(im&&im.base64) texUrl='data:image/png;base64,'+im.base64; }
+    let shinyUrl=null; if(m.texRel){ const sr=m.texRel.replace(/\.png$/i,'_shiny.png'); try{ const si=await csInvoke('read_pack_image',{path:PROJECT.root, rel:sr}); if(si&&si.base64) shinyUrl='data:image/png;base64,'+si.base64; }catch(e){} }
+    let anim=null; const animRel=m.animRel || m.rel.replace(/\.geo\.json$/i,'.animation.json');
+    try{ const af=await csInvoke('read_pack_file',{path:PROJECT.root, rel:animRel}); if(af&&af.text){ anim=JSON.parse(af.text); } }catch(e){ toast('Animación inválida para '+m.label,'err'); }
+    await buildActor(m.label, geo, texUrl, anim, shinyUrl);
+    if(!texUrl) toast('No encontré textura en el pack para «'+m.label+'» (se ve sin textura)','info');
+  }catch(e){ toast('Error: '+e.message,'err'); }
+}
+function removeActor(i){ const a=actors[i]; if(!a)return; stage.remove(a.group); actors.splice(i,1); if(sel>=actors.length) sel=actors.length-1; renderActorList(); renderActorProps(); }
+function selectActor(i){ sel=i; if(actors[i]) actors[i].animStart=performance.now(); renderActorList(); renderActorProps(); }
+function renderActorList(){ const el=$('actorList'); const es=$('emptyState'); if(es) es.style.display=actors.length?'none':'flex'; if(!actors.length){ el.innerHTML='<div class="muted" style="font-size:12px">Aún no hay Pokémon en la escena.</div>'; return; } el.innerHTML='';
+  actors.forEach((a,i)=>{ const d=document.createElement('div'); d.className='actor-row'+(i===sel?' on':''); const n=document.createElement('span'); n.className='an'; n.textContent=a.name.replace(/_/g,' '); const x=document.createElement('span'); x.className='ax'; x.textContent='✕'; x.title='Quitar'; x.onclick=e=>{ e.stopPropagation(); removeActor(i); }; d.appendChild(n); d.appendChild(x); d.onclick=()=>selectActor(i); el.appendChild(d); }); }
+function renderActorProps(){ const el=$('actorProps'); if(sel<0||!actors[sel]){ el.innerHTML=''; return; } const a=actors[sel];
+  const opts=a.animNames.map(n=>'<option value="'+esc(n)+'"'+(a.clip&&a.clip.name===n?' selected':'')+'>'+esc(n.replace(/^animation\.[^.]+\./,''))+'</option>').join('');
+  el.innerHTML='<div class="muted" style="margin-bottom:4px;text-transform:capitalize">'+a.name.replace(/_/g,' ')+'</div>'+
+    (a.animNames.length?('<label class="pl">Animación</label><div class="row2"><select id="acAnim" onchange="setActorAnim(this.value)" style="flex:1">'+opts+'</select><button class="btn small" id="acPlay" onclick="toggleActorAnim()" title="Reproducir/pausar">'+(a.animOn?'⏸':'▶')+'</button></div>'+(a.clip&&a.clip.length?('<label class="pl">Frame (congelar pose)</label><input type="range" min="0" max="'+a.clip.length.toFixed(2)+'" step="0.02" value="'+(a.frameT||0).toFixed(2)+'" oninput="setFrame(this.value)">'):'')):'<div class="muted">Sin animaciones</div>')+
+    '<label class="pl">Rotación</label><input type="range" min="0" max="360" value="'+Math.round(a.t.rotY*180/Math.PI)+'" oninput="setT(\'rotY\',this.value*Math.PI/180)">'+
+    '<label class="pl">Tamaño</label><input type="range" min="20" max="300" value="'+Math.round(a.t.scale*100)+'" oninput="setT(\'scale\',this.value/100)">'+
+    '<label class="pl">Altura</label><input type="range" min="-20" max="50" value="'+Math.round(a.t.y)+'" oninput="setT(\'y\',+this.value)">'+
+    '<label class="pl">Posición X</label><input type="range" id="acX" min="-80" max="80" value="'+Math.round(a.t.x)+'" oninput="setT(\'x\',+this.value)">'+
+    '<label class="pl">Posición Z</label><input type="range" id="acZ" min="-80" max="80" value="'+Math.round(a.t.z)+'" oninput="setT(\'z\',+this.value)">'+
+    '<div class="row2" style="margin-top:10px;gap:6px">'+(a.shinyUrl?'<button class="btn small'+(a.useShiny?' on':'')+'" onclick="toggleShiny()" title="Ver textura shiny">✨ Shiny</button>':'')+'<button class="btn small danger" onclick="removeActor('+sel+')">Quitar</button></div>';
+}
+function setT(k,v){ if(sel<0||!actors[sel])return; actors[sel].t[k]=+v; }
+function setActorAnim(name){ const a=actors[sel]; if(!a)return; a.clip=window.buildAnimClip(a.animation,name); a.animStart=performance.now(); a.animOn=true; a.frameT=0; renderActorProps(); }
+function toggleActorAnim(){ const a=actors[sel]; if(!a)return; a.animOn=!a.animOn; if(a.animOn){ a.animStart=performance.now()-(a.frameT||0)*1000; } else { a.frameT=((performance.now()-a.animStart)/1000)%((a.clip&&a.clip.length)||1); } renderActorProps(); }
+function setFrame(v){ const a=actors[sel]; if(!a||!a.clip)return; a.frameT=+v; a.animOn=false; const b=$('acPlay'); if(b) b.textContent='▶'; }   // congelar pose en un frame concreto
+
+// arrastrar un modelo por el suelo (clic + arrastrar)
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0); let dragging=false;
+function setNdc(e){ const r=canvas.getBoundingClientRect(); ndc.x=((e.clientX-r.left)/r.width)*2-1; ndc.y=-((e.clientY-r.top)/r.height)*2+1; }
+canvas.addEventListener('pointerdown',e=>{ if(e.button!==0||!actors.length) return; setNdc(e); ray.setFromCamera(ndc,camera); const hits=ray.intersectObjects(actors.map(a=>a.group),true); if(!hits.length) return; let o=hits[0].object; while(o&&o.parent!==stage) o=o.parent; const i=actors.findIndex(a=>a.group===o); if(i<0) return; selectActor(i); dragging=true; controls.enabled=false; try{ canvas.setPointerCapture(e.pointerId); }catch(_){ } });
+canvas.addEventListener('pointermove',e=>{ if(!dragging||sel<0) return; setNdc(e); ray.setFromCamera(ndc,camera); const p=new THREE.Vector3(); const dp=new THREE.Plane(new THREE.Vector3(0,1,0), -(actors[sel].t.y||0)); if(ray.ray.intersectPlane(dp,p)){ actors[sel].t.x=p.x; actors[sel].t.z=p.z; } });
+function endDrag(){ if(dragging){ dragging=false; controls.enabled=true; renderActorProps(); } }
+canvas.addEventListener('pointerup',endDrag);
+canvas.addEventListener('pointercancel',endDrag);
+window.addEventListener('pointerup',endDrag);   // si se suelta fuera del lienzo, no dejar la cámara bloqueada
+
+// ===== rejilla / suelo =====
+function toggleGrid(){ gridOn=!gridOn; $('gridBtn').classList.toggle('on',gridOn); if(gridOn) scene.add(grid); else scene.remove(grid); }
+
+// ===== fondo =====
+let bgMode='color', bgImgTex=null;
+function setBgMode(mode){ bgMode=mode; document.querySelectorAll('#bgModes .btn').forEach(b=>b.classList.toggle('on',b.dataset.bg===mode));
+  $('bgColorBox').style.display=mode==='color'?'':'none'; $('bgGradBox').style.display=(mode==='gradient'||mode==='radial')?'':'none'; $('bgImgBox').style.display=mode==='image'?'':'none'; applyBg(); }
+function gradTex(top,bot){ const cv=document.createElement('canvas'); cv.width=8; cv.height=256; const g=cv.getContext('2d'); const grd=g.createLinearGradient(0,0,0,256); grd.addColorStop(0,top); grd.addColorStop(1,bot); g.fillStyle=grd; g.fillRect(0,0,8,256); return new THREE.CanvasTexture(cv); }
+function radialTex(center,edge){ const cv=document.createElement('canvas'); cv.width=cv.height=512; const g=cv.getContext('2d'); const rg=g.createRadialGradient(256,256,20,256,256,360); rg.addColorStop(0,center); rg.addColorStop(1,edge); g.fillStyle=rg; g.fillRect(0,0,512,512); return new THREE.CanvasTexture(cv); }
+function applyBg(){
+  if(bgMode==='transparent'){ scene.background=null; renderer.setClearColor(0x000000,0); return; }
+  renderer.setClearColor(0x000000,1);
+  if(bgMode==='color'){ scene.background=new THREE.Color($('bgColA').value); }
+  else if(bgMode==='gradient'){ scene.background=gradTex($('bgColTop').value,$('bgColBot').value); }
+  else if(bgMode==='radial'){ scene.background=radialTex($('bgColTop').value,$('bgColBot').value); }
+  else if(bgMode==='image'){ if(bgImgTex){ bgImgTex.mapping=$('bgPano').checked?THREE.EquirectangularReflectionMapping:THREE.UVMapping; scene.background=bgImgTex; } else scene.background=new THREE.Color('#15110d'); }
+}
+function onBgImage(f){ if(!f) return; const url=URL.createObjectURL(f); new THREE.TextureLoader().load(url,t=>{ URL.revokeObjectURL(url); bgImgTex=t; bgMode='image'; setBgMode('image'); },undefined,()=>{ URL.revokeObjectURL(url); toast('No se pudo leer la imagen','err'); }); }
+
+// ===== presentación: aspecto WYSIWYG, marca/texto, color cine =====
+let aspectRatio=null;
+function setAspect(v){ aspectRatio=v?parseFloat(v):null; layoutCanvas(); }
+function layoutCanvas(){ const host=document.querySelector('.ph-center'); if(!host) return; const W=host.clientWidth,H=host.clientHeight; if(!aspectRatio){ canvas.style.width='100%'; canvas.style.height='100%'; } else { let w=W,h=W/aspectRatio; if(h>H){ h=H; w=H*aspectRatio; } canvas.style.width=Math.round(w)+'px'; canvas.style.height=Math.round(h)+'px'; } }
+window.addEventListener('resize',layoutCanvas);
+let logoImg=null;
+function onLogo(f){ if(!f) return; const url=URL.createObjectURL(f); const im=new Image(); im.onload=()=>{ URL.revokeObjectURL(url); logoImg=im; toast('Logo cargado','ok'); }; im.onerror=()=>{ URL.revokeObjectURL(url); toast('No se pudo leer el logo','err'); }; im.src=url; }
+function buildOverlay(w,h){ const title=($('capTitle')&&$('capTitle').value||'').trim(), sub=($('capSub')&&$('capSub').value||'').trim(); const hasCap=!!(title||sub), hasLogo=!!logoImg; if(!hasCap&&!hasLogo) return null;
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d');
+  if(hasCap){ const pad=Math.round(h*0.035), tS=Math.max(15,Math.round(h*0.05)), sS=Math.max(11,Math.round(h*0.032)); const stripH=(title?tS+10:0)+(sub?sS+6:0)+pad*2;
+    const gr=g.createLinearGradient(0,h-stripH,0,h); gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,0.65)'); g.fillStyle=gr; g.fillRect(0,h-stripH,w,stripH);
+    g.textAlign='left'; g.textBaseline='alphabetic'; let y=h-pad;
+    if(sub){ g.font=sS+'px sans-serif'; g.fillStyle='rgba(255,255,255,0.85)'; g.fillText(sub,pad,y); y-=sS+8; }
+    if(title){ g.font='bold '+tS+'px sans-serif'; g.fillStyle='#fff'; g.fillText(title,pad,y); }
+  }
+  if(hasLogo){ const corner=($('logoCorner')&&$('logoCorner').value)||'br', scl=(+($('logoSize')&&$('logoSize').value)||18)/100, op=(+($('logoOp')&&$('logoOp').value)||90)/100;
+    const lw=Math.round(w*scl), lh=Math.round(lw*(logoImg.height/logoImg.width||1)), m=Math.round(Math.min(w,h)*0.03);
+    let x=m,y=m; if(corner.indexOf('r')>=0) x=w-lw-m; if(corner.indexOf('b')>=0) y=h-lh-m;
+    g.globalAlpha=op; try{ g.drawImage(logoImg,x,y,lw,lh); }catch(e){} g.globalAlpha=1;
+  }
+  return cv;
+}
+let toneOn=false;
+function applyTexEncoding(tex){ if(!tex) return; tex.encoding = toneOn?THREE.sRGBEncoding:THREE.LinearEncoding; tex.needsUpdate=true; }
+function setTone(on){ toneOn=on; renderer.toneMapping = on?THREE.ACESFilmicToneMapping:THREE.NoToneMapping; renderer.outputEncoding = on?THREE.sRGBEncoding:THREE.LinearEncoding; renderer.toneMappingExposure=+($('expRange')&&$('expRange').value||1);
+  for(const a of actors){ applyTexEncoding(a.texNormal); applyTexEncoding(a.texShiny); if(a.mat) a.mat.needsUpdate=true; }
+  const eb=$('expBox'); if(eb) eb.style.display=on?'':'none'; }
+function setExposure(v){ renderer.toneMappingExposure=+v; }
+
+// ===== exportar =====
+let busyExport=false;
+async function exportPNG(scale){ if(busyExport||recording) return; busyExport=true;
+  try{ const cw=Math.round(canvas.clientWidth),ch=Math.round(canvas.clientHeight); const w=Math.round(cw*scale),h=Math.round(ch*scale);
+    renderer.setSize(w,h,false); updateCamAspect(w/h); renderer.render(scene,camera);
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d');
+    let ok=true; try{ g.drawImage(canvas,0,0,w,h); }catch(e){ ok=false; toast('No se pudo exportar: '+e.message,'err'); }
+    const ov=buildOverlay(w,h); if(ov) g.drawImage(ov,0,0);
+    renderer.setSize(cw,ch,false); updateCamAspect(cw/ch); renderer.render(scene,camera);
+    if(ok) await saveExport((actors[0]?actors[0].name:'foto')+'.png', cv.toDataURL('image/png').replace(/^data:[^,]+,/,''));
+  } finally{ busyExport=false; }
+}
+async function contactSheet(){ if(!actors.length){ toast('Añade al menos un Pokémon','err'); return; } if(busyExport||recording) return; busyExport=true;
+  const angles=[['front','Frontal'],['34','¾'],['side','Lateral'],['back','Trasera']]; const cell=512, cols=2, W=cell*cols, H=cell*2;
+  const savePos=camera.position.clone(), saveTgt=controls.target.clone(), savePR=renderer.getPixelRatio(), savedRot=stage.rotation.y, cw=canvas.clientWidth||640, ch=canvas.clientHeight||480;
+  recording=true; renderer.setPixelRatio(1); renderer.setSize(cell,cell,false); updateCamAspect(1);
+  const out=document.createElement('canvas'); out.width=W; out.height=H; const g=out.getContext('2d'); g.fillStyle='#15171c'; g.fillRect(0,0,W,H);
+  const tmp=document.createElement('canvas'); tmp.width=cell; tmp.height=cell; const tg=tmp.getContext('2d');
+  try{
+    for(let i=0;i<angles.length;i++){ camPreset(angles[i][0]); renderer.render(scene,camera); tg.clearRect(0,0,cell,cell); tg.drawImage(canvas,0,0,cell,cell);
+      const cx=(i%cols)*cell, cy=Math.floor(i/cols)*cell; g.drawImage(tmp,cx,cy);
+      g.font='bold 22px sans-serif'; const lw=g.measureText(angles[i][1]).width+18; g.fillStyle='rgba(0,0,0,0.5)'; g.fillRect(cx+10,cy+10,lw,30); g.fillStyle='#fff'; g.textBaseline='top'; g.fillText(angles[i][1],cx+19,cy+16);
+      await new Promise(r=>setTimeout(r,0));
+    }
+    const ov=buildOverlay(W,H); if(ov) g.drawImage(ov,0,0);
+    await saveExport((actors[0]?actors[0].name:'foto')+'_hoja.png', out.toDataURL('image/png').replace(/^data:[^,]+,/,''));
+  }catch(e){ toast('Error en la hoja de contacto: '+e.message,'err'); }
+  finally{ recording=false; busyExport=false; renderer.setPixelRatio(savePR); camera.position.copy(savePos); controls.target.copy(saveTgt); controls.update(); stage.rotation.y=savedRot; renderer.setSize(cw,ch,false); updateCamAspect((cw||1)/(ch||1)); renderer.render(scene,camera); }
+}
+function toggleRecord(){ if(recording){ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); return; }
+  if(!('MediaRecorder' in window)||!canvas.captureStream){ toast('Tu sistema no soporta grabación de vídeo','err'); return; }
+  const secs=Math.max(1,Math.min(20,+$('recSecs').value||4)); turntable=$('recTurn').checked; recDur=secs*1000; recStart=performance.now(); stage.rotation.y=0;
+  const stream=canvas.captureStream(30); let opts=[{mimeType:'video/webm;codecs=vp9'},{mimeType:'video/webm;codecs=vp8'},{mimeType:'video/webm'},undefined];
+  mediaRec=null; for(const o of opts){ try{ mediaRec=o?new MediaRecorder(stream,o):new MediaRecorder(stream); break; }catch(e){} }
+  if(!mediaRec){ toast('No se pudo iniciar la grabación','err'); return; }
+  const chunks=[]; mediaRec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+  mediaRec.onstop=()=>{ recording=false; turntable=false; stage.rotation.y=0; try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){} $('recBtn').textContent='● Grabar (WebM)'; $('recBtn').classList.remove('danger');
+    const blob=new Blob(chunks,{type:'video/webm'}); blobToB64(blob).then(b64=>saveExport((actors[0]?actors[0].name:'foto')+'.webm', b64)); };
+  recording=true; mediaRec.start(); $('recBtn').textContent='■ Detener'; $('recBtn').classList.add('danger');
+  setTimeout(()=>{ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); }, recDur+60);
+}
+
+// ===== presets de cámara y fondo =====
+function camPreset(v){ if(!v||!actors.length) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(stage); if(b.isEmpty()) return; const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16; const cy=c.y+s.y*0.05; let p;
+  if(v==='front') p=[c.x,cy,c.z+r*2]; else if(v==='back') p=[c.x,cy,c.z-r*2]; else if(v==='side') p=[c.x+r*2,cy,c.z]; else if(v==='top') p=[c.x,c.y+r*2.6,c.z+0.001]; else if(v==='low') p=[c.x,c.y+s.y*0.05,c.z+r*1.7]; else p=[c.x+r*1.4,c.y+s.y*0.45+r*0.4,c.z+r*1.6];
+  camera.position.set(p[0],p[1],p[2]); controls.target.set(c.x,cy,c.z); controls.update(); }
+function bgPreset(name){ const a=$('bgColA'),top=$('bgColTop'),bot=$('bgColBot');
+  if(name==='night'){ a.value='#0b1020'; setBgMode('color'); return; }
+  if(name==='white'){ a.value='#ffffff'; setBgMode('color'); return; }
+  const g={ sky:['#8fd0ff','#e8f6ff'], sunset:['#ff9a5a','#3a2350'], grass:['#9ad36b','#37652f'] }[name];
+  if(g){ top.value=g[0]; bot.value=g[1]; setBgMode('gradient'); } }
+// ===== export GIF (codificador propio, sin worker) =====
+async function exportGIF(seconds, turntable){
+  if(!window.encodeGIF){ toast('Codificador GIF no disponible','err'); return; }
+  if(!actors.length){ toast('Añade al menos un Pokémon','err'); return; }
+  if(recording){ toast('Espera a que termine la captura en curso','info'); return; }
+  const fps=12, frames=Math.min(72, Math.max(2, Math.round((seconds||4)*fps)));
+  const cw=canvas.clientWidth||640, ch=canvas.clientHeight||480, sc=Math.min(1, 420/Math.max(cw,ch));
+  const w=Math.max(2,Math.round(cw*sc)), h=Math.max(2,Math.round(ch*sc));
+  const btn=$('gifBtn'); if(btn){ btn.disabled=true; btn.textContent='⏳ GIF…'; }
+  recording=true; const savedRot=stage.rotation.y, savedPR=renderer.getPixelRatio();
+  renderer.setPixelRatio(1); renderer.setSize(w,h,false); updateCamAspect(w/h);
+  const cap=document.createElement('canvas'); cap.width=w; cap.height=h; const cx=cap.getContext('2d',{willReadFrequently:true});
+  const transparent=(bgMode==='transparent'); const fr=[]; const ov=buildOverlay(w,h);
+  try{
+    for(let i=0;i<frames;i++){ const t=i/fps;
+      for(const a of actors){ if(a.clip&&window.applyAnimClip) window.applyAnimClip(a.model,a.clip, a.animOn? t : (a.frameT||0)); }
+      if(turntable) stage.rotation.y=(i/frames)*Math.PI*2;
+      renderer.render(scene,camera);
+      cx.clearRect(0,0,w,h); cx.drawImage(canvas,0,0,w,h); if(ov) cx.drawImage(ov,0,0);
+      fr.push(cx.getImageData(0,0,w,h));
+      if((i&3)===0){ if(btn) btn.textContent='⏳ '+Math.round((i+1)/frames*100)+'%'; await new Promise(r=>setTimeout(r,0)); }
+    }
+    const bytes=window.encodeGIF(fr,w,h,Math.round(100/fps),{transparent,loop:0});
+    const b64=await blobToB64(new Blob([bytes])); await saveExport((actors[0]?actors[0].name:'foto')+'.gif', b64);
+  }catch(e){ toast('Error al crear el GIF: '+e.message,'err'); }
+  finally{ stage.rotation.y=savedRot; recording=false; renderer.setPixelRatio(savedPR); renderer.setSize(cw,ch,false); updateCamAspect(cw/ch); renderer.render(scene,camera); if(btn){ btn.disabled=false; btn.textContent='🎞️ GIF'; } }
+}
+
+// ===== picker de modelos (Repositorio + Mi pack) =====
+let allModels=[], packModels=[], pickSrc='repo';
+async function loadModels(){ const r=await fetch('/api/preview/models').then(r=>r.json()).catch(()=>({models:[]})); allModels=r.models||[]; }
+async function loadPackModels(){ packModels=[]; if(!PROJECT||!PROJECT.root) return; try{
+    const d=await csInvoke('pack_detail',{path:PROJECT.root}); const res=(d&&d.groups&&d.groups.resource)||{};
+    const models=res.models||[], texes=res.textures||[], anims=res.anims||[];   // texturas y animaciones viven en carpetas APARTE → buscar por nombre en todo el pack
+    const byBase=(arr,strip)=>{ const map={}; for(const it of arr){ const b=it.rel.split('/').pop().replace(strip,'').toLowerCase(); if(!(b in map)) map[b]=it.rel; } return map; };
+    const texByBase=byBase(texes,/\.png$/i), animByBase=byBase(anims,/\.animation\.json$/i);
+    const pick=(map,base)=>{ if(!base) return null; const lb=base.toLowerCase(); if(map[lb]) return map[lb]; const k=Object.keys(map).find(x=>x.startsWith(lb)); return k?map[k]:null; };
+    // mapa modelo→poser leyendo los resolvers (para resolver la animación cuando el nombre no casa)
+    const poserByModel={};
+    for(const rf of (res.resolvers||[])){ try{ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel:rf.rel}); if(!r||!r.text) continue; const j=JSON.parse(r.text); for(const v of (j.variations||[])){ if(v&&v.model){ const mb=String(v.model).split(/[/:]/).pop().toLowerCase().replace(/\.geo$/,''); const pb=v.poser?String(v.poser).split(/[/:]/).pop().toLowerCase():''; if(mb&&pb&&!(mb in poserByModel)) poserByModel[mb]=pb; } } }catch(e){} }
+    packModels=models.map(g=>{ const base=g.rel.split('/').pop().replace(/\.geo\.json$/i,'').replace(/\.geo$/i,''); const poser=poserByModel[base.toLowerCase()]; return { rel:g.rel, label:base, texRel:pick(texByBase,base), animRel:pick(animByBase,base)||pick(animByBase,poser) }; });
+  }catch(e){ packModels=[]; } }
+function curList(){ return pickSrc==='pack'?packModels:allModels; }
+function nameOf(m){ return pickSrc==='pack'?m.label:m.name; }
+function setPickSrc(s){ pickSrc=s; document.querySelectorAll('#pkTabs .btn').forEach(b=>b.classList.toggle('on',b.dataset.src===s)); $('pkSearch').value=''; renderPick(''); }
+function renderPick(q){ const el=$('pkList'); q=(q||'').toLowerCase();
+  if(pickSrc==='pack' && (!PROJECT||!PROJECT.root)){ el.innerHTML='<div class="mrow full">No hay ningún pack abierto.</div>'; return; }
+  const ms=curList().filter(m=>nameOf(m).toLowerCase().includes(q));
+  if(!ms.length){ el.innerHTML='<div class="mrow full">'+(pickSrc==='pack'?'Tu pack no tiene modelos (.geo.json).':'sin resultados')+'</div>'; return; }
+  el.innerHTML=''; for(const m of ms.slice(0,800)){ const d=document.createElement('div'); d.className='mrow'; const nm=nameOf(m); d.title=nm; d.textContent=nm.replace(/_/g,' '); d.onclick=()=>{ closePicker(); pickSrc==='pack'?addPackActor(m):addActor(m); }; el.appendChild(d); } }
+async function openPicker(){ $('pickerOverlay').style.display='flex'; $('pkSearch').value=''; $('pkList').innerHTML='<div class="mrow full"><span class="spinner"></span>Cargando…</div>'; await loadPackModels(); renderPick(''); setTimeout(()=>$('pkSearch').focus(),30); }
+function closePicker(){ $('pickerOverlay').style.display='none'; }
+let _pt=null; function filterPick(){ clearTimeout(_pt); _pt=setTimeout(()=>renderPick($('pkSearch').value),200); }
+
+// menú contextual: fondo/encuadre
+if(window.ctxMenu){ ctxMenu.fallback(()=>[ {icon:'🎯',label:'Encuadrar cámara',action:frameAll}, {icon:'➕',label:'Añadir modelo',action:openPicker} ]); }
+
+// acordeón: plegar/desplegar secciones (recuerda el estado)
+function toggleAcc(h){ const a=h.parentElement; a.classList.toggle('collapsed'); try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); st[a.dataset.k]=a.classList.contains('collapsed'); localStorage.setItem('cs_photo_acc',JSON.stringify(st)); }catch(e){} }
+function restoreAcc(){ try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); document.querySelectorAll('.acc').forEach(a=>{ if(a.dataset.k in st) a.classList.toggle('collapsed',!!st[a.dataset.k]); }); }catch(e){} }
+restoreAcc();
+applyLights(); applyBg(); layoutCanvas(); renderActorList(); loadModels(); loop();
+</script>
+</body></html>

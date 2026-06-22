@@ -436,6 +436,7 @@
     <div class="snav-items">
       <a class="snav-item" data-nav="paint" onclick="navPaint()">🖌️ Editor de modelos</a>
       <a class="snav-item" data-nav="paintpng" onclick="navPaintPng()">🖼️ Editor PNG</a>
+      <a class="snav-item" data-nav="photo" onclick="navPhoto()">📷 Modo foto</a>
     </div>
   </div>
 
@@ -487,6 +488,7 @@
     </div>
     <div class="snav-items">
       <a class="snav-item" data-nav="estado" onclick="navPack()">Contenido del pack</a>
+      <a class="snav-item" data-nav="editpack" onclick="navEditPack()">✏️ Editar mi pack</a>
       <a class="snav-item" data-nav="exportar" onclick="navExport()">Exportar .zip</a>
       <a class="snav-item" onclick="saveProjectFile()">Guardar proyecto</a>
       <a class="snav-item" onclick="$('projFile').click()">Cargar proyecto</a>
@@ -2187,13 +2189,14 @@ function openAppTab(id,title,icon,opener,kind){
   if(tab.kind==='assistant'&&tab.state){ try{ restoreCards(tab.state); }catch(e){} }
 }
 function activateAppTab(id){ const t=appTabs.find(x=>x.id===id); if(t) openAppTab(t.id,t.title,t.icon,t.opener,t.kind); }
+function closeTabsBatch(ids){ ids=ids||[]; const dirty=ids.filter(tabIsDirty); if(dirty.length && !confirm(dirty.length+' pestaña(s) tienen cambios sin guardar.\n¿Cerrarlas y perder los cambios?')) return; ids.forEach(x=>closeAppTab(x,null,true)); }
 function tabIsDirty(id){
   if(id.indexOf('frame:')===0){ const fr=document.querySelector('#frameScreen iframe[data-frame="'+id.slice(6)+'"]'); try{ return !!(fr&&fr.contentWindow&&fr.contentWindow.csFrameDirty&&fr.contentWindow.csFrameDirty()); }catch(e){ return false; } }
   if(id==='pack'){ try{ return Object.keys(pkDrafts||{}).length>0; }catch(e){ return false; } }
   return false;
 }
-function closeAppTab(id,ev){ if(ev)ev.stopPropagation(); const i=appTabs.findIndex(t=>t.id===id); if(i<0)return;
-  if(tabIsDirty(id) && !confirm('Esta pestaña tiene cambios sin guardar.\n¿Cerrarla y perder los cambios?')) return;   // anti-pérdida
+function closeAppTab(id,ev,skipConfirm){ if(ev)ev.stopPropagation(); const i=appTabs.findIndex(t=>t.id===id); if(i<0)return;
+  if(!skipConfirm && tabIsDirty(id) && !confirm('Esta pestaña tiene cambios sin guardar.\n¿Cerrarla y perder los cambios?')) return;   // anti-pérdida
   if(id.indexOf('frame:')===0){ const fr=document.querySelector('#frameScreen iframe[data-frame="'+id.slice(6)+'"]'); if(fr) fr.remove(); }   // libera el iframe
   const wasActive=(appActive===id); appTabs.splice(i,1);
   if(wasActive){ appActive=null; const nxt=appTabs[Math.min(i,appTabs.length-1)]; if(nxt) activateAppTab(nxt.id); else navHome(); }
@@ -2253,6 +2256,8 @@ const FRAME_PAGES={
   reskin: { url:'/reskin.html?embed=1',  title:'Reskin / aspecto', icon:'🎨', nav:'reskin' },
   paint:  { url:'/paint.html?embed=1',   title:'Editor de modelos', icon:'🖌️', nav:'paint' },
   paintpng:{ url:'/paint.html?embed=1&mode=png', title:'Editor PNG', icon:'🖼️', nav:'paintpng' },
+  photo:  { url:'/photo.html?embed=1', title:'Modo foto', icon:'📷', nav:'photo' },
+  mypack: { url:'/mypack.html?embed=1', title:'Editar mi pack', icon:'✏️', nav:'editpack' },
 };
 function setFrameMode(on){   // alterna entre el contenido normal (.wrap+.foot) y el host de iframes
   const w=document.querySelector('.appmain>.wrap'), foot=document.querySelector('.appmain>.foot'), fh=$('frameScreen');
@@ -2278,6 +2283,32 @@ function navCreator(){ openFrameTab('creator'); }
 function navReskin(){ openFrameTab('reskin'); }
 function navPaint(){ openFrameTab('paint'); }
 function navPaintPng(){ openFrameTab('paintpng'); }
+function navPhoto(){ openFrameTab('photo'); }
+function navEditPack(){ openFrameTab('mypack'); }
+// ===== Modo edición: editar un caso del pack (lo llama mypack.html) =====
+function csEditFiles(rels){ if(!rels||!rels.length) return; navPack(); setTimeout(()=>{ try{ const rel=rels[0]; const cat=(typeof pkCatOf==='function')?pkCatOf(rel):'datapack'; openTab(encodeURIComponent(rel), cat); }catch(e){} }, 350); }
+function csEditSet(card, sel, val){ const el=card.querySelector(sel); if(!el) return; if(el.type==='checkbox') el.checked=!!val; else el.value=(val==null?'':String(val)); try{ el.dispatchEvent(new Event(el.tagName==='SELECT'||el.type==='checkbox'?'change':'input',{bubbles:true})); }catch(e){} }
+const CS_EDIT_REVERSE={
+  berry:(c,d)=>{ const b=d.berry||{}, fl=b.flavours||{}, y=b.baseYield||{}, g=b.growthTime||{}; csEditSet(c,'.y-name',d.name); csEditSet(c,'.y-colour',(b.colour||'RED')); csEditSet(c,'.y-biomes',(b.preferredBiomeTags||[]).join(', ')); csEditSet(c,'.y-ymin',y.min); csEditSet(c,'.y-ymax',y.max); csEditSet(c,'.y-gmin',g.min); csEditSet(c,'.y-gmax',g.max); csEditSet(c,'.y-spicy',fl.SPICY||0); csEditSet(c,'.y-dry',fl.DRY||0); csEditSet(c,'.y-sweet',fl.SWEET||0); csEditSet(c,'.y-bitter',fl.BITTER||0); csEditSet(c,'.y-sour',fl.SOUR||0); },
+  mark:(c,d)=>{ const m=d.mark||{}; csEditSet(c,'.r-name',d.name); if(d.ns) csEditSet(c,'.r-ns',d.ns); if(d.title!=null) csEditSet(c,'.r-title',d.title); if(d.descText!=null) csEditSet(c,'.r-desc',d.descText); csEditSet(c,'.r-index',m.indexNumber); csEditSet(c,'.r-color',m.titleColor?('#'+String(m.titleColor).replace(/^#/,'')):''); csEditSet(c,'.r-chance',m.chance); csEditSet(c,'.r-texture',m.texture); },
+  dexEntry:(c,d)=>{ const e=d.entry||{}; csEditSet(c,'.e-species',(e.speciesId||'')); csEditSet(c,'.e-forms',(e.forms||[]).map(f=>f.displayForm).filter(Boolean).join(', ')); csEditSet(c,'.e-aspects',(e.displayAspects||[]).join(', ')); if(d.region) csEditSet(c,'.e-region',d.region); },
+  regional:(c,d)=>{ const fm=d.form||{}; csEditSet(c,'.g-target',d.target||('cobblemon:'+d.sp)); csEditSet(c,'.g-aspect',d.aspect); csEditSet(c,'.g-formname',fm.name); csEditSet(c,'.g-t1',fm.primaryType); csEditSet(c,'.g-t2',fm.secondaryType); csEditSet(c,'.g-abil',(fm.abilities||[]).join(', ')); if(d.folder) csEditSet(c,'.g-folder',d.folder); },
+  reskin:(c,d)=>{ csEditSet(c,'.k-target',d.target||('cobblemon:'+d.sp)); csEditSet(c,'.k-aspect',d.aspect); if(d.folder) csEditSet(c,'.k-folder',d.folder); },
+  cosmetic:(c,d)=>{ const co=d.cos||{}; const sp=(co.pokemon||[])[0]||''; const ci=(co.cosmeticItems||[])[d.idx||0]||(co.cosmeticItems||[])[0]||{}; csEditSet(c,'.wc-target',sp?('cobblemon:'+String(sp).split(':').pop()):''); csEditSet(c,'.wc-item',(ci.consumedItem||'').split(':').pop()); csEditSet(c,'.wc-aspect',(ci.aspects||[])[0]||''); if(d.folder) csEditSet(c,'.wc-folder',d.folder); },
+  spawn:(c,d)=>{ const s=d.spawn||{}, cond=s.condition||{}; csEditSet(c,'.ws-mon',(s.pokemon||'').split(':').pop()); if(s.bucket) csEditSet(c,'.ws-bucket',s.bucket); if(s.spawnablePositionType) csEditSet(c,'.ws-pos',s.spawnablePositionType); if(s.level) csEditSet(c,'.ws-level',s.level); if(s.weight!=null) csEditSet(c,'.ws-weight',s.weight); if(cond.timeRange) csEditSet(c,'.ws-time',cond.timeRange); if(cond.biomes) csEditSet(c,'.ws-biomes',(cond.biomes||[]).join(', ')); if(cond.minY!=null) csEditSet(c,'.ws-miny',cond.minY); if(cond.maxY!=null) csEditSet(c,'.ws-maxy',cond.maxY); },
+};
+function csOpenAssist(assistId, presets){ if(!lastRoot){ showLauncher(); return; } assistant(assistId); const card=$('cards')&&$('cards').querySelector('.card'); if(card&&presets){ for(const sel in presets) csEditSet(card, sel, presets[sel]); } }
+const CS_EDIT_ASSIST={ berry:'berry', mark:'mark', dexEntry:'pokedex', regional:'variante', reskin:'aspecto', cosmetic:'complemento', spawn:'aparezca' };
+function csEditEntity(type, ent){ if(!lastRoot){ showLauncher(); return; }
+  const assistId=CS_EDIT_ASSIST[type], rev=CS_EDIT_REVERSE[type];
+  if(!assistId||!rev){ csEditFiles(ent&&ent.files); return; }
+  assistant(assistId);
+  const card=$('cards')&&$('cards').querySelector('.card'); if(!card) return;
+  try{ rev(card, ent.data||{}); }catch(e){ console.error(e); }
+  try{ if($('overwrite')) $('overwrite').checked=true; }catch(e){}   // editar = sobrescribir
+  const t=$('assistTitle'); if(t) t.textContent='✏️ Editando: '+(ent.title||assistId);
+  const h=document.querySelector('#assistBar .assist-hint'); if(h) h.innerHTML='Cambia lo que quieras y pulsa <b>Crear y añadir al pack</b> (sobrescribe).';
+}
 
 function setActiveNav(key){ document.querySelectorAll('#appside .snav-item').forEach(a=>{ const on=key!=null && a.dataset.nav===key; a.classList.toggle('on', on); if(on){ const g=a.closest('.snav-group'); if(g) g.classList.remove('collapsed'); } }); }
 // categorías plegables del menú lateral (estado persistente en localStorage)
@@ -2700,8 +2731,8 @@ function csComputeUnsaved(){
   try{ if(Object.keys(pkDrafts||{}).length) return true; }catch(e){}
   return false;
 }
-let _unsavedT=null;
-function csNoteDirty(){ clearTimeout(_unsavedT); _unsavedT=setTimeout(()=>{ try{ csInvoke('set_unsaved',{flag:csComputeUnsaved()}); }catch(e){} }, 250); }
+let _lastUnsaved=null;
+function csNoteDirty(){ const d=csComputeUnsaved(); if(d!==_lastUnsaved){ _lastUnsaved=d; try{ csInvoke('set_unsaved',{flag:d}); }catch(e){} } }   // inmediato (sin race al cerrar)
 window.csNoteDirty=csNoteDirty;   // los iframes lo llaman cuando cambia su estado
 async function checkForUpdates(){
   try{ const r=await csInvoke('check_and_update');
@@ -2735,8 +2766,8 @@ if(window.ctxMenu){
       {icon:'↗',label:'Ir a esta pestaña',action:()=>activateAppTab(id)},
       {sep:true},
       {icon:'✕',label:'Cerrar',action:()=>closeAppTab(id)},
-      {icon:'⊟',label:'Cerrar las demás',disabled:!others.length,action:()=>others.map(t=>t.id).forEach(x=>closeAppTab(x))},
-      {icon:'⊠',label:'Cerrar todas',action:()=>appTabs.slice().map(t=>t.id).forEach(x=>closeAppTab(x))},
+      {icon:'⊟',label:'Cerrar las demás',disabled:!others.length,action:()=>closeTabsBatch(others.map(t=>t.id))},
+      {icon:'⊠',label:'Cerrar todas',action:()=>closeTabsBatch(appTabs.slice().map(t=>t.id))},
     ];
   });
   // bloques de contenido (tarjetas)

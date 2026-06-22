@@ -236,7 +236,7 @@
     <div class="dpbody">
       <canvas id="c"></canvas>
       <div class="viewer-toolbar"><button class="btn small" id="p3dbtn" onclick="togglePaint3D()" title="pintar en 3D">🖌️3D</button><button class="btn small" onclick="spin=!spin" title="girar">↻</button></div>
-      <div id="hud" class="hud" style="font-size:14px">🎨 Selecciona un Pokémon en el panel ▶</div>
+      <div id="hud" class="hud">Arrastra para rotar · rueda = zoom · 🖌️3D para pintar</div>
     </div>
   </div>
   <div class="dpanel" data-panel="layers" data-title="Capas">
@@ -259,6 +259,8 @@ const QP = new URLSearchParams(location.search);
 const PNG_MODE = QP.get('mode')==='png';   // editor de PNG suelto (sin modelo 3D)
 function splitPath(p){ const s=String(p).replace(/[\\/]+$/,''); const i=Math.max(s.lastIndexOf('\\'),s.lastIndexOf('/')); return {parent:s.slice(0,i),base:s.slice(i+1)}; }
 async function apiPost(url,body){ try{ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return await r.json(); }catch(e){ return {error:'No se pudo conectar: '+e.message}; } }
+async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+async function saveExport(name,b64){ try{ const p=await csInvoke('save_export',{name,b64}); if(p) toast('Guardado en: '+p,'ok'); else toast('Guardado cancelado','info'); return p; }catch(e){ toast('No se pudo guardar: '+e.message,'err'); return null; } }
 const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'');
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 // aviso flotante abajo-derecha (type: 'ok' | 'err' | 'info')
@@ -561,10 +563,10 @@ function importPNG(){ $('imp').click(); }
 async function onImportFile(input){ const f=input.files&&input.files[0]; if(!f) return; const url=URL.createObjectURL(f); const img=await loadImg(url); URL.revokeObjectURL(url); if(!img) return;
   if(!doc.layers.length){ doc.w=img.width; doc.h=img.height; comp.width=doc.w; comp.height=doc.h; cctx=comp.getContext('2d'); scratch.width=doc.w; scratch.height=doc.h; sctx=scratch.getContext('2d'); }
   const L=makeLayer(f.name.replace(/\.png$/i,'')); L.ctx.drawImage(img,0,0,doc.w,doc.h); doc.layers.push(L); doc.active=doc.layers.length-1; renderLayers(); recomposite(); if(!geoCur) fitView(); input.value=''; }
-function exportPNG(){ flush(); const a=document.createElement('a'); a.download=(picked?picked.name:'textura')+'.png'; a.href=comp.toDataURL('image/png'); a.click(); clearDirty(); }
+async function exportPNG(){ flush(); const b64=comp.toDataURL('image/png').replace(/^data:[^,]+,/,''); const p=await saveExport((picked?picked.name:'textura')+'.png', b64); if(p) clearDirty(); }
 
 // ===== anti-pérdida: marcar trabajo sin guardar + autoguardado para recuperar tras un cierre/apagón =====
-let dirtyWork=false, _autoT=null;
+let dirtyWork=false, _autoT=null, _quotaWarned=false;
 const RECOVER_KEY=PNG_MODE?'cs_paint_recover_png':'cs_paint_recover';
 window.csFrameDirty=()=>dirtyWork;   // lo consulta el padre (aviso al cerrar pestaña/app)
 function notifyParentDirty(){ try{ if(window.parent&&window.parent!==window&&window.parent.csNoteDirty) window.parent.csNoteDirty(); }catch(e){} }
@@ -576,20 +578,21 @@ function saveRecover(){ if(!dirtyWork||!doc.layers.length) return; try{ flush();
   const snap={ v:1, ts:Date.now(), mode:PNG_MODE?'png':'model', picked:picked, aspect:($('aspect')?$('aspect').value:''), w:doc.w, h:doc.h, active:doc.active, geo:PNG_MODE?null:geoCur,
     layers:doc.layers.map(L=>({name:L.name,visible:L.visible,opacity:L.opacity,blend:L.blend,locked:L.locked,data:L.canvas.toDataURL('image/png')})) };
   localStorage.setItem(RECOVER_KEY, JSON.stringify(snap));
-  }catch(e){ /* cuota o serialización: se ignora, no romper el editor */ } }
+  }catch(e){ if(!_quotaWarned){ _quotaWarned=true; toast('No se pudo autoguardar para recuperación (almacén lleno). Guarda al pack para no perder el trabajo.','err'); } } }
 function clearRecover(){ try{ localStorage.removeItem(RECOVER_KEY); }catch(e){} }
 async function restoreRecover(snap){
   doc.w=snap.w; doc.h=snap.h; resizeDoc();
-  if(snap.mode==='model'){ geoCur=snap.geo||null; uvMap=geoCur?buildUVMap(geoCur):[]; picked=snap.picked||null; }
+  if(snap.mode==='model'){ geoCur=(snap.geo&&snap.geo['minecraft:geometry'])?snap.geo:null; uvMap=geoCur?buildUVMap(geoCur):[]; picked=snap.picked||null; }
   else { geoCur=null; uvMap=[]; picked=null; }
-  const layers=[];
-  for(const Ld of (snap.layers||[])){ const L=makeLayer(Ld.name); L.visible=Ld.visible!==false; L.opacity=(Ld.opacity==null?1:Ld.opacity); L.blend=Ld.blend||'source-over'; L.locked=!!Ld.locked; const img=await loadImg(Ld.data); if(img) L.ctx.drawImage(img,0,0); layers.push(L); }
+  const layers=[]; let failed=0;
+  for(const Ld of (snap.layers||[])){ const L=makeLayer(Ld.name); L.visible=Ld.visible!==false; L.opacity=(Ld.opacity==null?1:Ld.opacity); L.blend=Ld.blend||'source-over'; L.locked=!!Ld.locked; const img=await loadImg(Ld.data); if(img) L.ctx.drawImage(img,0,0); else failed++; layers.push(L); }
   doc.layers=layers.length?layers:[makeLayer('Base')]; doc.active=Math.min(snap.active||0, doc.layers.length-1);
   history.undo=[]; history.redo=[]; sel=null; moveData=null;
   if($('aspect')&&snap.aspect) $('aspect').value=snap.aspect;
   if(geoCur) renderModel();
   renderLayers(); fitView(); recomposite(); updateHistButtons(); if(typeof updateAspectSlug==='function') updateAspectSlug();
   enterEditor(); dirtyWork=true; notifyParentDirty();
+  if(failed) toast('Recuperado, pero '+failed+' capa(s) no se pudieron leer','info'); else toast('Trabajo recuperado','ok');
 }
 function checkRecover(){ try{ const raw=localStorage.getItem(RECOVER_KEY); if(!raw) return; const snap=JSON.parse(raw); if(!snap||!snap.layers||!snap.layers.length) return;
   const b=$('recoverBanner'); if(!b) return; const when=snap.ts?new Date(snap.ts).toLocaleString():''; const what=(snap.mode==='model'&&snap.picked&&snap.picked.name)?('«'+snap.picked.name+'»'):'un lienzo';
