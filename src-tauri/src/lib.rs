@@ -267,10 +267,217 @@ fn write_file(path: String, rel: String, text: String) -> Value {
     match write_atomic(&full, text.as_bytes()) { Ok(_) => json!({"ok": true}), Err(e) => json!({"error": e.to_string()}) }
 }
 
+// ===== Verificador del pack (port fiel del packVerify de Electron) =====
+fn vfy_add(issues: &mut Vec<Value>, level: &str, msg: String, file: &str) {
+    issues.push(json!({"level": level, "msg": msg, "file": file}));
+}
+fn vfy_need(checklist: &mut Vec<Value>, seen: &mut std::collections::HashSet<String>, kind: &str, p: String, hint: &str) {
+    if p.is_empty() || seen.contains(&p) { return; }
+    seen.insert(p.clone());
+    checklist.push(json!({"kind": kind, "path": p, "hint": hint}));
+}
+fn vfy_asset_path(r: &str) -> Option<String> {
+    if !r.contains(':') { return None; }
+    let i = r.find(':').unwrap();
+    Some(format!("assets/{}/{}", &r[..i], &r[i + 1..]))
+}
+fn vfy_own(r: &str) -> bool {
+    let ns = r.split(':').next().unwrap_or("");
+    ns != "cobblemon" && ns != "minecraft" && ns != "c"
+}
+// ¿el poser anima con su propio nombre? aprox. del regex q\.bedrock[a-z_]*\(\s*'name'
+fn vfy_poser_self_animates(txt: &str, name: &str) -> bool {
+    if name.is_empty() { return false; }
+    let pat = format!("'{}'", name);
+    let mut from = 0;
+    while let Some(rel) = txt[from..].find(&pat) {
+        let idx = from + rel;
+        let pre = txt[..idx].trim_end();
+        if let Some(paren) = pre.strip_suffix('(') {
+            let pt = paren.trim_end();
+            if let Some(qpos) = pt.rfind("q.bedrock") {
+                let tail = &pt[qpos + "q.bedrock".len()..];
+                if tail.chars().all(|c| c.is_ascii_lowercase() || c == '_') { return true; }
+            }
+        }
+        from = idx + pat.len();
+    }
+    false
+}
+// assets/<ns>/bedrock/pokemon/posers/<folder...>/<file>.json -> (ns, folder)
+fn vfy_poser_path(rel: &str) -> (String, String) {
+    let parts: Vec<&str> = rel.split('/').collect();
+    if let Some(pi) = parts.iter().position(|&x| x == "posers") {
+        let ns = if parts.len() > 1 { parts[1].to_string() } else { "cobblemon".into() };
+        if parts.len() > pi + 2 { return (ns, parts[pi + 1..parts.len() - 1].join("/")); }
+        return (ns, String::new());
+    }
+    ("cobblemon".into(), String::new())
+}
+
 #[tauri::command]
 fn pack_verify(path: String) -> Value {
-    let exists = !path.is_empty() && Path::new(&path).exists();
-    json!({"exists": exists, "issues": [], "counts": {"error": 0, "warn": 0}, "checklist": []})
+    use std::collections::{HashMap, HashSet};
+    let abs = Path::new(&path);
+    if path.is_empty() || !abs.exists() { return json!({"exists": false}); }
+
+    // archivos de data/ y assets/
+    struct F { rel: String, abs: std::path::PathBuf }
+    let mut all: Vec<F> = Vec::new();
+    for sub in ["data", "assets"] {
+        let d = abs.join(sub);
+        if !d.exists() { continue; }
+        for e in walkdir::WalkDir::new(&d).into_iter().filter_map(|x| x.ok()) {
+            if e.file_type().is_file() {
+                if let Ok(r) = e.path().strip_prefix(abs) {
+                    all.push(F { rel: r.to_string_lossy().replace('\\', "/"), abs: e.path().to_path_buf() });
+                }
+            }
+        }
+    }
+    let relset: HashSet<String> = all.iter().map(|f| f.rel.to_lowercase()).collect();
+    let has = |rel: &str| relset.contains(&rel.to_lowercase());
+    let read = |p: &Path| -> Option<Value> {
+        std::fs::read_to_string(p).ok().and_then(|s| serde_json::from_str::<Value>(&s).ok())
+    };
+
+    let mut issues: Vec<Value> = Vec::new();
+    let mut checklist: Vec<Value> = Vec::new();
+    let mut seen_check: HashSet<String> = HashSet::new();
+    let mut poser_names: HashSet<String> = HashSet::new();
+    let mut model_names: HashSet<String> = HashSet::new();
+    let mut lang_keys: HashSet<String> = HashSet::new();
+    let mut resolver_sp: HashSet<String> = HashSet::new();
+    let mut species: Vec<(String, String)> = Vec::new();
+    let mut marks: Vec<(Option<i64>, String, Option<String>, Option<String>)> = Vec::new();
+    let mut anim_base: HashSet<String> = HashSet::new();
+    let empty: Vec<Value> = Vec::new();
+
+    // 1ª pasada: catalogar
+    for f in &all {
+        let rl = f.rel.to_lowercase();
+        let fnm = rl.rsplit('/').next().unwrap_or("");
+        if rl.contains("/posers/") && rl.ends_with(".json") {
+            poser_names.insert(fnm.strip_suffix(".json").unwrap_or(fnm).to_string());
+        }
+        if rl.contains("/models/") && (rl.ends_with(".geo.json") || rl.ends_with(".geo")) {
+            let b = fnm.strip_suffix(".geo.json").or_else(|| fnm.strip_suffix(".geo")).unwrap_or(fnm);
+            model_names.insert(b.to_string());
+        }
+        if rl.contains("/animations/") && rl.ends_with(".animation.json") {
+            anim_base.insert(fnm.strip_suffix(".animation.json").unwrap_or(fnm).to_string());
+        }
+        if rl.contains("/lang/") && rl.ends_with(".json") {
+            match read(&f.abs) {
+                Some(o) => { if let Some(obj) = o.as_object() { for k in obj.keys() { lang_keys.insert(k.to_lowercase()); } } }
+                None => vfy_add(&mut issues, "error", "Archivo de textos (lang) con JSON inválido".into(), &f.rel),
+            }
+        }
+        if rl.contains("/species/") && rl.ends_with(".json")
+            && !rl.contains("species_additions") && !rl.contains("species_features") && !rl.contains("species_feature_assignments") {
+            match read(&f.abs) {
+                Some(o) => {
+                    let name = o["name"].as_str().map(|s| s.to_string())
+                        .unwrap_or_else(|| fnm.strip_suffix(".json").unwrap_or(fnm).to_string()).to_lowercase();
+                    species.push((name, f.rel.clone()));
+                }
+                None => vfy_add(&mut issues, "error", "Un Pokémon (species) tiene el JSON inválido".into(), &f.rel),
+            }
+        }
+        if rl.contains("/marks/") && rl.ends_with(".json") {
+            if let Some(o) = read(&f.abs) {
+                marks.push((o["indexNumber"].as_i64(), f.rel.clone(),
+                    o["texture"].as_str().map(|s| s.to_string()), o["name"].as_str().map(|s| s.to_string())));
+            }
+        }
+    }
+
+    // 2ª pasada: resolvers (apariencias)
+    for f in &all {
+        let rl = f.rel.to_lowercase();
+        if !(rl.contains("/resolvers/") && rl.ends_with(".json")) { continue; }
+        let o = match read(&f.abs) { Some(o) => o, None => { vfy_add(&mut issues, "error", "Una apariencia (resolver) tiene el JSON inválido".into(), &f.rel); continue; } };
+        if let Some(sp) = o["species"].as_str() { resolver_sp.insert(sp.to_lowercase()); }
+        let rfolder = f.rel.split("/resolvers/").nth(1).and_then(|s| s.split('/').next()).unwrap_or("").to_string();
+        let fp = if rfolder.is_empty() { String::new() } else { format!("{}/", rfolder) };
+        for v in o["variations"].as_array().unwrap_or(&empty) {
+            if let Some(t) = v["texture"].as_str() { if vfy_own(t) { if let Some(p) = vfy_asset_path(t) { if !has(&p) {
+                vfy_add(&mut issues, "error", format!("Falta la textura: {} → el Pokémon se vería sin textura", t), &f.rel);
+                vfy_need(&mut checklist, &mut seen_check, "Textura (.png)", p, "la imagen del Pokémon");
+            } } } }
+            for ly in v["layers"].as_array().unwrap_or(&empty) {
+                if let Some(t) = ly["texture"].as_str() { if vfy_own(t) { if let Some(p) = vfy_asset_path(t) { if !has(&p) {
+                    vfy_add(&mut issues, "warn", format!("Falta una capa de textura: {}", t), &f.rel);
+                    vfy_need(&mut checklist, &mut seen_check, "Textura de capa (.png)", p, "capa emisiva/extra");
+                } } } }
+            }
+            if let Some(ps) = v["poser"].as_str() { if vfy_own(ps) {
+                let nm = ps.rsplit(|c| c == '/' || c == ':').next().unwrap_or(ps).to_lowercase();
+                let pns = ps.split(':').next().unwrap_or("cobblemon");
+                if !poser_names.contains(&nm) {
+                    vfy_add(&mut issues, "warn", format!("El poser \"{}\" no se encuentra (faltarían animaciones)", ps), &f.rel);
+                    vfy_need(&mut checklist, &mut seen_check, "Poser (.json)", format!("assets/{}/bedrock/pokemon/posers/{}{}.json", pns, fp, nm), "liga las animaciones a las poses");
+                }
+            } }
+            if let Some(md) = v["model"].as_str() { if vfy_own(md) {
+                let seg = md.rsplit(|c| c == '/' || c == ':').next().unwrap_or(md);
+                let nm = if seg.to_lowercase().ends_with(".geo") { &seg[..seg.len() - 4] } else { seg };
+                let pns = md.split(':').next().unwrap_or("cobblemon");
+                if !model_names.contains(&nm.to_lowercase()) {
+                    vfy_add(&mut issues, "warn", format!("El modelo \"{}\" no se encuentra (¿exportaste el .geo de Blockbench?)", md), &f.rel);
+                    vfy_need(&mut checklist, &mut seen_check, "Modelo 3D (.geo.json)", format!("assets/{}/bedrock/pokemon/models/{}{}.geo.json", pns, fp, nm), "exportar de Blockbench");
+                }
+            } }
+        }
+    }
+
+    // posers que esperan su propia animación
+    for f in &all {
+        let rl = f.rel.to_lowercase();
+        if !(rl.contains("/posers/") && rl.ends_with(".json")) { continue; }
+        let fnm = rl.rsplit('/').next().unwrap_or("");
+        let self_name = fnm.strip_suffix(".json").unwrap_or(fnm).to_string();
+        if anim_base.contains(&self_name) { continue; }
+        let txt = std::fs::read_to_string(&f.abs).unwrap_or_default().to_lowercase();
+        let needle: String = self_name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+        if vfy_poser_self_animates(&txt, &needle) {
+            let (pns, folder) = vfy_poser_path(&f.rel);
+            let fp = if folder.is_empty() { String::new() } else { format!("{}/", folder) };
+            vfy_add(&mut issues, "warn", format!("Faltan las animaciones de \"{}\" (.animation.json)", self_name), &f.rel);
+            vfy_need(&mut checklist, &mut seen_check, "Animación (.animation.json)", format!("assets/{}/bedrock/pokemon/animations/{}{}.animation.json", pns, fp, self_name), "exportar de Blockbench");
+        }
+    }
+
+    // species sin apariencia / sin nombre
+    for (name, file) in &species {
+        if !resolver_sp.iter().any(|r| r.rsplit(':').next().unwrap_or(r) == name) {
+            vfy_add(&mut issues, "warn", format!("El Pokémon \"{}\" no tiene apariencia (resolver): saldrá como sustituto/invisible", name), file);
+        }
+        if !lang_keys.contains(&format!("cobblemon.species.{}.name", name)) {
+            vfy_add(&mut issues, "warn", format!("El Pokémon \"{}\" no tiene nombre en el juego (falta lang)", name), file);
+        }
+    }
+
+    // marcas: índices duplicados, textura y nombre
+    let mut seen_idx: HashMap<i64, bool> = HashMap::new();
+    for (idx, file, _t, _n) in &marks {
+        if let Some(i) = idx {
+            if seen_idx.contains_key(i) { vfy_add(&mut issues, "error", format!("Dos marcas usan el mismo número {} (colisionan)", i), file); }
+            else { seen_idx.insert(*i, true); }
+        }
+    }
+    for (_idx, file, texture, mname) in &marks {
+        if let Some(t) = texture { if vfy_own(t) { if let Some(p) = vfy_asset_path(t) { if !has(&p) {
+            vfy_add(&mut issues, "warn", format!("A la marca le falta su textura: {}", t), file);
+        } } } }
+        if let Some(n) = mname { if !lang_keys.contains(&format!("{}.title", n).to_lowercase()) {
+            vfy_add(&mut issues, "warn", format!("La marca no tiene nombre en el juego (falta lang \"{}.title\")", n), file);
+        } }
+    }
+
+    let err = issues.iter().filter(|i| i["level"].as_str() == Some("error")).count();
+    let warn = issues.iter().filter(|i| i["level"].as_str() == Some("warn")).count();
+    json!({"exists": true, "total": all.len(), "issues": issues, "checklist": checklist, "counts": {"error": err, "warn": warn}})
 }
 
 #[tauri::command]

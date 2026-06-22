@@ -139,16 +139,18 @@ function buildEvolutions(evos) {
       ev.requiredContext = e.item && e.item.includes(':') ? e.item : 'cobblemon:' + (e.item || 'fire_stone');
     } else if (e.kind === 'trade') {
       ev.variant = 'trade';
-      if (has(e.heldItem)) ev.requirements.push({ variant: 'held_item', itemCondition: e.heldItem.includes(':') ? e.heldItem : 'cobblemon:' + e.heldItem });
     } else if (e.kind === 'friendship') {
       ev.variant = 'level_up';
       ev.requirements.push({ variant: 'friendship', amount: intOr(e.amount, 160) });
-      if (has(e.timeRange)) ev.requirements.push({ variant: 'time_range', range: e.timeRange });
     } else { // level
       ev.variant = 'level_up';
       ev.requirements.push({ variant: 'level', minLevel: intOr(e.minLevel, 16) });
-      if (has(e.timeRange)) ev.requirements.push({ variant: 'time_range', range: e.timeRange });
     }
+    // requisitos genéricos (válidos para cualquier tipo de evolución)
+    if (has(e.timeRange)) ev.requirements.push({ variant: 'time_range', range: e.timeRange });
+    if (has(e.biome)) ev.requirements.push({ variant: 'biome', biomeCondition: e.biome });
+    if (has(e.heldItem)) ev.requirements.push({ variant: 'held_item', itemCondition: e.heldItem.includes(':') ? e.heldItem : 'cobblemon:' + e.heldItem });
+    if (Array.isArray(e.extraRequirements)) e.extraRequirements.forEach((r) => { if (r && typeof r === 'object') ev.requirements.push(r); });
     return ev;
   });
 }
@@ -279,7 +281,9 @@ function buildDexEntry(it) {
   const obj = { id, speciesId: sp, displayAspects: list(it.displayAspects), conditionAspects: [],
     forms: forms.map((f) => ({ displayForm: f, unlockForms: [f] })), variations: [] };
   const region = slug(it.region || 'custom');
-  return [{ rel: `${D}/dex_entries/pokemon/${region}/${slug(sp.split(':').pop())}.json`, obj }];
+  const out = [{ rel: `${D}/dex_entries/pokemon/${region}/${slug(sp.split(':').pop())}.json`, obj }];
+  if (has(it.description)) out.push(...buildLang({ namespace: sp.split(':')[0], extra: [{ key: `cobblemon.species.${slug(sp.split(':').pop())}.desc`, value: it.description }] }));
+  return out;
 }
 function buildDexAddition(it) {
   const dexId = it.dexId && it.dexId.includes(':') ? it.dexId : 'cobblemon:' + slug(it.dexId || 'national');
@@ -312,16 +316,21 @@ function buildPokerod(it) {
 }
 function buildMark(it) {
   const name = slug(it.name); if (!name) throw new Error('Marca: falta el nombre');
+  const ns = slug(it.namespace) || 'cobblemon';
   const obj = {
     name: `cobblemon.mark.${name}`, title: `cobblemon.mark.${name}.title`,
     description: `cobblemon.mark.${name}.desc`,
-    // textura en el namespace del PROPIO pack (no cobblemon:, que aliasaria una textura inexistente)
-    texture: it.texture || `${slug(it.namespace) || 'mypack'}:textures/gui/mark/${name}.png`,
+    texture: it.texture || `${ns}:textures/gui/mark/${name}.png`,
     indexNumber: intOr(it.indexNumber, 1000),
   };
   if (has(it.titleColor)) obj.titleColor = it.titleColor.replace('#', '');
   if (has(it.chance)) obj.chance = numOr(it.chance, 0.04);
-  return [{ rel: `${D}/marks/${name}.json`, obj }];
+  const out = [{ rel: `${D}/marks/${name}.json`, obj }];
+  const extra = [];
+  if (has(it.title)) extra.push({ key: `cobblemon.mark.${name}.title`, value: it.title });
+  if (has(it.descText)) extra.push({ key: `cobblemon.mark.${name}.desc`, value: it.descText });
+  if (extra.length) out.push(...buildLang({ namespace: ns, extra }));
+  return out;
 }
 function buildFossil(it) {
   const result = String(it.result || '').toLowerCase().replace(/^cobblemon:/, '').trim();
@@ -602,7 +611,7 @@ function wizRegional(it) {
   out.push(...buildAddition({ target, fileName: sp + '_' + aspect, createFeature: false,
     form: { enabled: true, name: it.formName || aspect, primaryType: it.primaryType, secondaryType: it.secondaryType, abilities: it.abilities, aspects: aspect,
       baseStats: it.baseStats ? { enabled: true, ...it.baseStats } : { enabled: false }, shoulderMountable: false, shoulderEffects: [] } }));
-  out.push(...buildResolverOverride({ target, folder, aspects: aspect, order: it.order || 1, suffix: aspect, model: it.model, emissive: it.emissive }));
+  out.push(...buildResolverOverride({ target, folder, aspects: aspect, order: it.order || 1, suffix: aspect, model: it.model, poser: it.poser, emissive: it.emissive }));
   if (has(it.name)) out.push(...buildLang({ namespace: ns, extra: [{ key: `cobblemon.species.${sp}.aspect.${aspect}`, value: it.name }] }));
   return out;
 }
@@ -630,7 +639,7 @@ function wizCosmetic(it) {
   const folder = (it.folder ? slug(it.folder) : '') || sp;
   const out = [];
   out.push(...buildCosmetic({ pokemon: sp, fileName: it.fileName || aspect, entries: [{ consumedItem: item, aspects: aspect }] }));
-  out.push(...buildResolverOverride({ target, folder, aspects: aspect, order: it.order || 1, suffix: aspect, model: it.model, texture: it.texture, emissive: it.emissive }));
+  out.push(...buildResolverOverride({ target, folder, aspects: aspect, order: it.order || 1, suffix: aspect, model: it.model, texture: it.texture, poser: it.poser, emissive: it.emissive }));
   return out;
 }
 // Poblar: spawn + entrada de Pokédex + añadir a una dex
@@ -639,7 +648,8 @@ function wizSpawnDex(it) {
   const mon = String(it.pokemon || '').toLowerCase().replace(/^.*:/, '').trim();
   if (!mon) throw new Error('Spawn+Pokédex: falta el Pokémon');
   const out = [];
-  out.push(...buildSpawn({ fileName: mon, spawns: [{ pokemon: mon, bucket: it.bucket || 'common', spawnablePositionType: it.pos || 'grounded', level: it.level || '5-30', weight: it.weight || '6', presets: 'natural', condition: { biomes: it.biomes, timeRange: it.timeRange } }] }));
+  out.push(...buildSpawn({ fileName: mon, spawns: [{ pokemon: mon, bucket: it.bucket || 'common', spawnablePositionType: it.pos || 'grounded', level: it.level || '5-30', weight: it.weight || '6', presets: 'natural',
+    condition: { biomes: it.biomes, timeRange: it.timeRange, minLight: it.minLight, maxLight: it.maxLight, minSkyLight: it.minSkyLight, maxSkyLight: it.maxSkyLight, minY: it.minY, maxY: it.maxY, canSeeSky: it.canSeeSky, moonPhase: it.moonPhase, isRaining: it.isRaining, isThundering: it.isThundering, fluid: it.fluid, structures: it.structures, neededNearbyBlocks: it.neededNearbyBlocks } }] }));
   if (has(it.dexId)) {
     out.push(...buildDexEntry({ speciesId: ns + ':' + mon, region: it.region || 'custom', forms: 'Normal' }));
     out.push(...buildDexAddition({ dexId: it.dexId, entries: ns + ':' + mon }));
@@ -656,7 +666,8 @@ function wizEvolution(it) {
   if (!result) throw new Error('Evolución: falta el resultado');
   const out = [];
   out.push(...buildAddition({ target, fileName: sp + '_evo', createFeature: false,
-    evolutions: [{ kind: it.evoKind || 'level', result, minLevel: it.minLevel, item: it.item, amount: it.amount, timeRange: it.timeRange, learnableMoves: it.learnableMoves }],
+    evolutions: [{ kind: it.evoKind || 'level', result, minLevel: it.minLevel, item: it.item, amount: it.amount, timeRange: it.timeRange,
+      biome: it.biome, heldItem: it.heldItem, consumeHeldItem: it.consumeHeldItem, extraRequirements: it.extraRequirements, learnableMoves: it.learnableMoves }],
     form: { enabled: false } }));
   if (it.setPreEvo) out.push(...buildAddition({ target: ns + ':' + result, fileName: result + '_preevo', createFeature: false, preEvolution: sp, form: { enabled: false } }));
   return out;

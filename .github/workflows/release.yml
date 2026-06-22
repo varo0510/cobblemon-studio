@@ -44,6 +44,10 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Cobblemon Studio ${{ github.ref_name }}'
-          releaseBody: 'Descarga el instalador. A partir de esta versión la app se autoactualiza al abrir.'
+          releaseBody: |
+            Descarga el instalador `*_x64-setup.exe`. A partir de esta versión la app se autoactualiza al abrir.
+
+            ⚠️ **Windows mostrará "Editor desconocido" (SmartScreen)** — es normal en una app nueva sin firmar, no es peligrosa (el código es público).
+            Para instalar: en el aviso azul pulsa **Más información → Ejecutar de todas formas**. Si el navegador bloquea la descarga: **··· → Conservar → Conservar de todas formas**.
           releaseDraft: false
           prerelease: false

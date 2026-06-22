@@ -70,9 +70,48 @@
   body.assist #assistBar{display:flex}
   .assist-title{font-size:16px;font-weight:650}
   .assist-hint{color:var(--dim);font-size:12px;margin-left:auto}
-  body.assist #sections,body.assist #tabsbar,body.assist .catlegend,body.assist #search,body.assist #sechint,body.assist #packStatePanel,body.assist .group{display:none!important}
+  body.assist #sections,body.assist #tabsbar,body.assist .catlegend,body.assist #search,body.assist #sechint,body.assist #packStatePanel,body.assist .group,body.assist #resumeBanner{display:none!important}
   body.assist #panelContent>h2{display:none}
   body.assist .foot>:not(#btnGen){display:none}   /* en asistente, el footer es solo "Crear" */
+  /* ===== ASISTENTE = página dedicada full-window (como creador/reskin) ===== */
+  body.assist .appmain>.wrap{max-width:none;padding:0;overflow:hidden}
+  body.assist #panelContent{display:flex;flex-direction:column;height:100%;margin:0;padding:0;border:0;border-radius:0;background:transparent}
+  body.assist #assistBar{position:sticky;top:0;z-index:3;background:var(--panel);border-bottom:1px solid var(--line);margin:0;padding:13px 22px}
+  body.assist #assistBar .assist-title{font-size:18px;font-weight:700}
+  body.assist #assistBar .assist-hint{font-size:12px}
+  body.assist #asstBody{flex:1;min-height:0;display:flex}
+  body.assist #asstFormCol{flex:1;min-width:0;overflow:auto}
+  body.assist #asstInner{max-width:720px;margin:0 auto;padding:22px 24px 30px}
+  body.assist #cards{margin:0!important}
+  /* el formulario sin el chrome de "card" (lo aporta la cabecera): aire y legibilidad */
+  body.assist #cards .card{background:transparent;border:0;padding:0;margin:0;animation:none}
+  body.assist #cards .card>.head{display:none}
+  body.assist #cards .card>.hint:first-of-type{margin:0 0 16px;font-size:12.5px}
+  /* panel del visor 3D (asistentes con Pokémon) */
+  #asstRight{display:none}
+  body.assist.asst-model #asstRight{display:flex;flex-direction:column;flex:0 0 46%;min-width:0;border-left:1px solid var(--line);background:var(--scene-bg)}
+  /* selector de Pokémon en la columna izquierda (como Reskin) */
+  #asstPicker{margin-bottom:16px}
+  #asstPicker>input{width:100%}
+  #asstList{max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r2);background:var(--panel2);
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:3px;padding:5px;margin-top:8px}
+  #asstList .mrow{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:var(--r1);
+    cursor:pointer;font-size:11.5px;background:var(--panel);border:1px solid transparent;white-space:nowrap;overflow:hidden}
+  #asstList .mrow:hover{background:var(--panel2);border-color:var(--line)}
+  #asstList .mrow.active{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  #asstList .mrow>span:first-child{overflow:hidden;text-overflow:ellipsis}
+  #asstList .mrow .tag{font-size:9px;opacity:.55;flex:0 0 auto;text-transform:uppercase}
+  #asstList .mrow.full{grid-column:1/-1;cursor:default;color:var(--dim)}
+  .asst3d-stage{flex:1;position:relative;min-height:0}
+  #asstCanvas{width:100%;height:100%;display:block}
+  /* sección de archivos de los asistentes (subir modelo/textura/animación) */
+  .asst-assets{margin-top:8px}
+  .asst-assets .upgrid{display:flex;flex-wrap:wrap;gap:8px}
+  .asst-assets input[type=file]{display:none}
+  .asst-files{margin-top:8px}
+  .res-sec .res-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+  .res-row{display:flex;gap:8px;align-items:center}
+  .res-row .res-path{flex:1}
   /* CONTENIDO DEL PACK (home rico) */
   .ph-hero{display:flex;align-items:center;gap:14px;margin-bottom:6px;padding-bottom:16px;border-bottom:1px solid var(--line)}
   .ph-hero .logo{width:40px;height:40px}
@@ -789,7 +828,13 @@
       <button class="small" onclick="dismissResume()">Descartar</button>
     </div>
     <div id="assistBar"><button class="btn small" onclick="navHome()">← Volver</button><span class="assist-title" id="assistTitle"></span><span class="assist-hint">Rellena y pulsa <b>Crear</b> abajo.</span></div>
-    <div id="cards" style="margin-top:14px"><p class="muted" id="empty">Añade uno o varios bloques con los botones de arriba.</p></div>
+    <div id="asstBody">
+      <div id="asstFormCol"><div id="asstInner">
+        <div id="asstPicker"></div>
+        <div id="cards" style="margin-top:14px"><p class="muted" id="empty">Añade uno o varios bloques con los botones de arriba.</p></div>
+      </div></div>
+      <aside id="asstRight"></aside>
+    </div>
   </div>
 
   <div class="panel hide" id="resPanel"><h2>Resultado</h2><div class="results" id="results"></div></div>
@@ -1493,13 +1538,15 @@ function tplRideEnv(amb,label){return `<fieldset class="env" data-amb="${amb}">
       <div><label>JUMP</label><input type="text" class="st-JUMP" value="30-60"></div>
       <div><label>STAMINA</label><input type="text" class="st-STAMINA" value="40-80"></div>
     </div>
+    ${amb==='LAND'?`<div class="row"><div><label class="chk" style="margin-top:6px"><input type="checkbox" class="env-canjump" checked> Puede saltar</label></div><div><label class="chk" style="margin-top:6px"><input type="checkbox" class="env-cansprint" checked> Puede esprintar</label></div></div>`:''}
   </div></fieldset>`;}
 function readRideEnvs(scope){
   const envs=[];
   scope.querySelectorAll('.env').forEach(e=>{
     if(!e.querySelector('.env-on').checked) return;
     const v=(s)=>(e.querySelector(s)||{}).value||'';
-    envs.push({amb:e.dataset.amb,key:v('.env-key'),stats:{SPEED:v('.st-SPEED'),ACCELERATION:v('.st-ACCELERATION'),SKILL:v('.st-SKILL'),JUMP:v('.st-JUMP'),STAMINA:v('.st-STAMINA')}});
+    const ej=e.querySelector('.env-canjump'), es=e.querySelector('.env-cansprint');
+    envs.push({amb:e.dataset.amb,key:v('.env-key'),stats:{SPEED:v('.st-SPEED'),ACCELERATION:v('.st-ACCELERATION'),SKILL:v('.st-SKILL'),JUMP:v('.st-JUMP'),STAMINA:v('.st-STAMINA')},canJump:ej?ej.checked:undefined,canSprint:es?es.checked:undefined});
   });
   return envs;
 }
@@ -1578,7 +1625,10 @@ dex:()=>`<div class="head"><b>Dex (región)</b> <button class="del small" onclic
 dexentry:()=>`<div class="head"><b>Entrada de dex</b> <button class="del small" onclick="rm(this)">eliminar</button></div>
   <div class="row"><div><label>speciesId</label><input type="text" class="e-species" placeholder="cobblemon:lucario"></div>
     <div><label>Región (carpeta)</label><input type="text" class="e-region" placeholder="miregion"></div></div>
-  <label>Formas (coma)</label><input type="text" class="e-forms" placeholder="Normal, Mega">`,
+  <label>Formas (coma)</label><input type="text" class="e-forms" placeholder="Normal, Mega">
+  <label>Aspectos a mostrar (coma, opc)${T('Aspectos con los que se ve el Pokémon en la Pokédex (ej: alolan, shiny).')}</label><input type="text" class="e-aspects" placeholder="">
+  <label>Descripción Pokédex (texto, opc)${T('Sobrescribe el texto de flavor de la Pokédex: genera el lang cobblemon.species.<id>.desc.')}</label><textarea class="e-desc" placeholder="Vive en cumbres heladas y solo desciende al valle en pleno invierno…"></textarea>
+  <div class="row"><div><label>id de la entrada (opcional)</label><input type="text" class="e-id" placeholder="(auto)"></div></div>`,
 
 dexaddition:()=>`<div class="head"><b>Añadir a dex</b> <button class="del small" onclick="rm(this)">eliminar</button></div>
   <label>dexId destino</label><input type="text" class="da-dex" placeholder="cobblemon:national">
@@ -1599,10 +1649,17 @@ pokerod:()=>`<div class="head"><b>Caña</b> <button class="del small" onclick="r
 
 mark:()=>`<div class="head"><b>Marca</b> <button class="del small" onclick="rm(this)">eliminar</button></div>
   <div class="row"><div><label>Nombre (clave)</label><input type="text" class="r-name" placeholder="mark_campeon"></div>
+    <div><label>Namespace del pack</label><input type="text" class="r-ns" placeholder="cobblemon"></div></div>
+  <div class="row"><div><label>Título visible</label><input type="text" class="r-title" placeholder="Campeón"></div>
     <div><label>Color título (#hex)</label><input type="text" class="r-color" placeholder="#CE3A49"></div></div>
+  <label>Descripción</label><input type="text" class="r-desc" placeholder="Marca otorgada a los campeones de la liga.">
   <div class="row"><div><label>indexNumber (único)${T('Numero unico que identifica la marca. No lo repitas con otra marca.')}</label><input type="number" class="r-index" value="1000"></div>
     <div><label>chance (0-1, opcional)</label><input type="number" class="r-chance" step="0.01" placeholder="0.04"></div></div>
-  <label>Textura (opcional)</label><input type="text" class="r-texture" placeholder="auto">`,
+  <label>Textura (ref, opcional)</label><input type="text" class="r-texture" placeholder="auto">
+  <fieldset class="asst-assets"><legend>Icono de la marca</legend>
+    <div class="upgrid"><label class="btn small">🖼️ Icono .png<input type="file" accept=".png" onchange="asstFile(this,'markicon')"></label></div>
+    <p class="hint asst-files">Sube el icono (se guarda en <code>textures/gui/mark/&lt;nombre&gt;.png</code>).</p>
+  </fieldset>`,
 
 fossil:()=>`<div class="head"><b>Fósil</b> <button class="del small" onclick="rm(this)">eliminar</button></div>
   <label>Pokémon resultante</label><input type="text" class="o-result" placeholder="aerodactyl">
@@ -1689,7 +1746,16 @@ wizregional:()=>`<div class="head"><b>🗺️ Forma regional</b> <button class="
     <div><label>Carpeta (Ndex_nombre)</label><input type="text" class="g-folder" placeholder="0037_vulpix"></div></div>
   <div class="row"><div><label>Nombre de la forma</label><input type="text" class="g-formname" placeholder="glaciar"></div>
     <div><label>Tipo 1</label><select class="g-t1">${opt(TYPES.slice(1),'normal')}</select></div><div><label>Tipo 2</label><select class="g-t2">${opt(TYPES)}</select></div></div>
-  <label>Habilidades (coma)</label><input type="text" class="g-abil" placeholder="snowcloak">`,
+  <label>Habilidades (coma)</label><input type="text" class="g-abil" placeholder="snowcloak">
+  <fieldset class="asst-assets"><legend>Archivos de la forma</legend>
+    <div class="upgrid">
+      <label class="btn small">🖼️ Textura .png<input type="file" accept=".png" onchange="asstFile(this,'tex')"></label>
+      <label class="btn small">✨ Emisiva .png<input type="file" accept=".png" onchange="asstFile(this,'emissive')"></label>
+      <label class="btn small">🧊 Modelo .geo.json<input type="file" accept=".json" onchange="asstFile(this,'model')"></label>
+      <label class="btn small">🎞️ Animación .json<input type="file" accept=".json" onchange="asstFile(this,'anim')"></label>
+    </div>
+    <p class="hint asst-files">Sin archivos. La <b>textura</b> es lo mínimo para que la forma se vea distinta; modelo y animación son opcionales (para una forma con cuerpo propio).</p>
+  </fieldset>`,
 
 wizreskin:()=>`<div class="head"><b>🎨 Retextura de Pokémon (reskin)</b> <button class="del small" onclick="rm(this)">eliminar</button></div>
   <div class="hint">Cambia la <b>textura (apariencia) de un Pokémon</b> existente —ej. una versión dorada o navideña— reutilizando su modelo y animaciones. NO es la skin del jugador. Genera: feature + resolver override. Tú aportas el .png recoloreado.</div>
@@ -1705,7 +1771,16 @@ wizcosmetic:()=>`<div class="head"><b>🎩 Cosmético por objeto</b> <button cla
   <div class="row"><div><label>Aspecto (clave)</label><input type="text" class="wc-aspect" placeholder="(auto: cosmetic_item-objeto)"></div>
     <div><label>Carpeta (Ndex_nombre)</label><input type="text" class="wc-folder" placeholder="0025_pikachu"></div></div>
   <div class="row"><div><label>Modelo del cosmético (.geo, opc)</label><input type="text" class="wc-model" placeholder="(hereda)"></div>
-    <div><label>Textura (opcional)</label><input type="text" class="wc-tex" placeholder="(auto)"></div></div>`,
+    <div><label>Textura (ref, opcional)</label><input type="text" class="wc-tex" placeholder="(auto)"></div></div>
+  <fieldset class="asst-assets"><legend>Archivos del cosmético</legend>
+    <div class="upgrid">
+      <label class="btn small">🖼️ Textura .png<input type="file" accept=".png" onchange="asstFile(this,'tex')"></label>
+      <label class="btn small">✨ Emisiva .png<input type="file" accept=".png" onchange="asstFile(this,'emissive')"></label>
+      <label class="btn small">🧊 Modelo .geo.json<input type="file" accept=".json" onchange="asstFile(this,'model')"></label>
+      <label class="btn small">🎞️ Animación .json<input type="file" accept=".json" onchange="asstFile(this,'anim')"></label>
+    </div>
+    <p class="hint asst-files">Sube el <b>modelo</b> del Pokémon con el cosmético puesto y su <b>textura</b>. Si no subes modelo, hereda el del Pokémon (solo cambia la textura).</p>
+  </fieldset>`,
 
 wizspawndex:()=>`<div class="head"><b>🌿 Poblar (spawn + Pokédex)</b> <button class="del small" onclick="rm(this)">eliminar</button></div>
   <div class="hint">Hace que un Pokémon aparezca en el mundo y lo registra en una Pokédex. Genera: spawn + entrada de dex + añadir a dex.</div>
@@ -1715,9 +1790,25 @@ wizspawndex:()=>`<div class="head"><b>🌿 Poblar (spawn + Pokédex)</b> <button
   <div class="row"><div><label>Rareza</label><select class="ws-bucket">${opt(['common','uncommon','rare','ultra-rare'])}</select></div>
     <div><label>Posición</label><select class="ws-pos">${opt(['grounded','submerged','surface','seafloor','fishing'])}</select></div>
     <div><label>Nivel</label><input type="text" class="ws-level" value="5-30"></div>
+    <div><label>Peso (rareza fina)</label><input type="text" class="ws-weight" placeholder="6"></div>
     <div><label>Momento</label><select class="ws-time">${optv([['',''],['day','día'],['night','noche'],['dusk','atardecer'],['dawn','amanecer']])}</select></div></div>
   <div class="row"><div><label>Añadir a dex (opcional)</label><input type="text" class="ws-dexid" placeholder="cobblemon:national"></div>
-    <div><label>Región (carpeta)</label><input type="text" class="ws-region" placeholder="custom"></div></div>`,
+    <div><label>Región (carpeta)</label><input type="text" class="ws-region" placeholder="custom"></div></div>
+  <fieldset><legend>Condiciones avanzadas (opcional)</legend>
+    <div class="row"><div><label>Luz mín</label><input type="number" class="ws-minlight" min="0" max="15"></div>
+      <div><label>Luz máx</label><input type="number" class="ws-maxlight" min="0" max="15"></div>
+      <div><label>Luz de cielo mín</label><input type="number" class="ws-minsky" min="0" max="15"></div>
+      <div><label>Luz de cielo máx</label><input type="number" class="ws-maxsky" min="0" max="15"></div></div>
+    <div class="row"><div><label>Altura Y mín</label><input type="number" class="ws-miny"></div>
+      <div><label>Altura Y máx</label><input type="number" class="ws-maxy"></div>
+      <div><label>¿A cielo abierto?</label><select class="ws-sky">${optv([['',''],['true','sí'],['false','no']])}</select></div>
+      <div><label>Fase lunar (0-7)</label><input type="number" class="ws-moon" min="0" max="7"></div></div>
+    <div class="row"><div><label>¿Lloviendo?</label><select class="ws-rain">${optv([['',''],['true','sí'],['false','no']])}</select></div>
+      <div><label>¿Tormenta?</label><select class="ws-thunder">${optv([['',''],['true','sí'],['false','no']])}</select></div>
+      <div><label>En fluido</label><select class="ws-fluid">${optv([['',''],['minecraft:water','agua'],['minecraft:lava','lava']])}</select></div></div>
+    <label>Estructuras necesarias (coma) ${T('El Pokémon solo aparece dentro de estas estructuras. Admite tags (#) e ids (minecraft:village).')}</label><input type="text" class="ws-struct" placeholder="#cobblemon:has_cobblemon, minecraft:village">
+    <label>Bloques cercanos necesarios (coma)</label><input type="text" class="ws-nearby" placeholder="minecraft:water, #minecraft:flowers">
+  </fieldset>`,
 
 wizevolution:()=>`<div class="head"><b>🔀 Evolución</b> <button class="del small" onclick="rm(this)">eliminar</button></div>
   <div class="hint">Conecta una evolución entre dos Pokémon. Genera el species_addition con la evolución (y, opcional, la preevolución en el resultado).</div>
@@ -1728,6 +1819,14 @@ wizevolution:()=>`<div class="head"><b>🔀 Evolución</b> <button class="del sm
     <div><label>Piedra/item</label><input type="text" class="we-item" placeholder="cobblemon:dragon_stone"></div>
     <div><label>Amistad</label><input type="number" class="we-amount" placeholder="160"></div></div>
   <label>Movimientos al evolucionar (coma, opc)</label><input type="text" class="we-moves" placeholder="dig">
+  <fieldset><legend>Condiciones extra (opcional, cualquier tipo)</legend>
+    <div class="row"><div><label>Momento del día</label><select class="we-time">${optv([['',''],['day','día'],['night','noche'],['dusk','atardecer'],['dawn','amanecer']])}</select></div>
+      <div><label>Bioma (id o #tag)</label><input type="text" class="we-biome" placeholder="#cobblemon:is_cold"></div></div>
+    <div class="row"><div><label>Objeto sostenido</label><input type="text" class="we-held" placeholder="cobblemon:kings_rock"></div>
+      <div><label class="chk" style="margin-top:20px"><input type="checkbox" class="we-consume"> Consumir el objeto al evolucionar</label></div></div>
+    <label>Requisitos extra (JSON avanzado, uno por línea) ${T('Para casos raros (género, movimiento aprendido, etc.). Pega objetos requirement de Cobblemon. Ej: {"variant":"has_move","move":"ancientpower"}')}</label>
+    <textarea class="we-extra" placeholder='{"variant":"biome","biomeCondition":"#cobblemon:is_swamp"}'></textarea>
+  </fieldset>
   <label class="chk"><input type="checkbox" class="we-preevo" checked> Marcar la preevolución en el resultado</label>`,
 
 dexentryaddition:()=>`<div class="head"><b>Editar entrada de dex</b> <button class="del small" onclick="rm(this)">eliminar</button></div>
@@ -1849,6 +1948,7 @@ recipe:`<b>Receta</b> — una receta de crafteo <b>vanilla</b> (formato MC 1.21)
 };
 
 function addCard(kind){$('empty')&&$('empty').remove();const c=document.createElement('div');c.className='card';c.dataset.kind=kind;c.dataset.cat=CAT[kind]||'pokemon';c.innerHTML=TPL[kind]();$('cards').appendChild(c);
+  if(RES_CFG[kind]) c.insertAdjacentHTML('beforeend', resourceSectionHTML());
   // botón ? + panel de ayuda
   const head=c.querySelector('.head'); const del=head.querySelector('.del');
   const actions=document.createElement('div'); actions.className='actions';
@@ -1912,11 +2012,11 @@ function collectCard(c){
   if(k==='spawnpreset') return {kind:'spawnpreset',name:v(c,'.p-name'),condition:readCond(c)};
   if(k==='bait') return {kind:'bait',item:v(c,'.b-item'),effects:rows(c,'.baitfx').map(e=>({type:v(e,'.bf-type'),chance:v(e,'.bf-chance'),value:v(e,'.bf-value'),subcategory:v(e,'.bf-sub')}))};
   if(k==='dex') return {kind:'dex',id:v(c,'.x-id'),sortOrder:v(c,'.x-sort'),entries:v(c,'.x-entries')};
-  if(k==='dexentry') return {kind:'dexentry',speciesId:v(c,'.e-species'),region:v(c,'.e-region'),forms:v(c,'.e-forms')};
+  if(k==='dexentry') return {kind:'dexentry',speciesId:v(c,'.e-species'),region:v(c,'.e-region'),forms:v(c,'.e-forms'),displayAspects:v(c,'.e-aspects'),description:v(c,'.e-desc'),id:v(c,'.e-id')};
   if(k==='dexaddition') return {kind:'dexaddition',dexId:v(c,'.da-dex'),entries:v(c,'.da-entries')};
   if(k==='berry') return {kind:'berry',name:v(c,'.y-name'),colour:v(c,'.y-colour'),preferredBiomeTags:v(c,'.y-biomes'),yieldMin:v(c,'.y-ymin'),yieldMax:v(c,'.y-ymax'),growthMin:v(c,'.y-gmin'),growthMax:v(c,'.y-gmax'),spicy:v(c,'.y-spicy'),dry:v(c,'.y-dry'),sweet:v(c,'.y-sweet'),bitter:v(c,'.y-bitter'),sour:v(c,'.y-sour')};
   if(k==='pokerod') return {kind:'pokerod',pokeBallId:v(c,'.k-ball'),lineColor:v(c,'.k-color')};
-  if(k==='mark') return {kind:'mark',name:v(c,'.r-name'),titleColor:v(c,'.r-color'),indexNumber:v(c,'.r-index'),chance:v(c,'.r-chance'),texture:v(c,'.r-texture')};
+  if(k==='mark'){ const f=c._files||{}; return {kind:'mark',name:v(c,'.r-name'),namespace:v(c,'.r-ns'),title:v(c,'.r-title'),descText:v(c,'.r-desc'),titleColor:v(c,'.r-color'),indexNumber:v(c,'.r-index'),chance:v(c,'.r-chance'),texture:(f.markicon)?'':v(c,'.r-texture')}; }
   if(k==='fossil') return {kind:'fossil',result:v(c,'.o-result'),fossils:v(c,'.o-fossils')};
   if(k==='resolver') return {kind:'resolver',species:v(c,'.rs-sp'),namespace:v(c,'.rs-ns'),folder:v(c,'.rs-folder'),model:v(c,'.rs-model'),poser:v(c,'.rs-poser'),shiny:c.querySelector('.rs-shiny').checked,emissive:c.querySelector('.rs-emis').checked};
   if(k==='resolveroverride') return {kind:'resolveroverride',target:v(c,'.ro-target'),folder:v(c,'.ro-folder'),aspects:v(c,'.ro-aspects'),order:v(c,'.ro-order'),suffix:v(c,'.ro-suffix'),model:v(c,'.ro-model'),poser:v(c,'.ro-poser'),texture:v(c,'.ro-tex'),emissive:c.querySelector('.ro-emis').checked};
@@ -1929,11 +2029,22 @@ function collectCard(c){
     shiny:c.querySelector('.w-shiny').checked,emissive:c.querySelector('.w-emis').checked,shoulder:c.querySelector('.w-shoulder').checked,
     spawnBiomes:c.querySelector('.w-spawnon').checked?v(c,'.w-biomes'):'',bucket:v(c,'.w-bucket'),level:v(c,'.w-level'),
     dexId:c.querySelector('.w-dexon').checked?v(c,'.w-dexid'):'',region:v(c,'.w-region')};
-  if(k==='wizregional') return {kind:'wizregional',target:v(c,'.g-target'),aspect:v(c,'.g-aspect'),folder:v(c,'.g-folder'),formName:v(c,'.g-formname'),primaryType:v(c,'.g-t1'),secondaryType:v(c,'.g-t2'),abilities:v(c,'.g-abil')};
+  if(k==='wizregional'){ const f=c._files||{}; const sp=((v(c,'.g-target').split(':').pop())||'').toLowerCase().replace(/[^a-z0-9_]/g,''); const aspect=(window.CSB.slug(v(c,'.g-aspect')))||'regional'; const K=sp&&aspect?sp+'_'+aspect:'';
+    return {kind:'wizregional',target:v(c,'.g-target'),aspect:v(c,'.g-aspect'),folder:v(c,'.g-folder'),formName:v(c,'.g-formname'),primaryType:v(c,'.g-t1'),secondaryType:v(c,'.g-t2'),abilities:v(c,'.g-abil'),
+      model:(f.model&&K)?K:undefined, poser:(f.anim&&K)?K:undefined, emissive:!!f.emissive}; }
   if(k==='wizreskin') return {kind:'wizreskin',target:v(c,'.k-target'),aspect:v(c,'.k-aspect'),folder:v(c,'.k-folder'),texture:v(c,'.k-tex')};
-  if(k==='wizcosmetic') return {kind:'wizcosmetic',target:v(c,'.wc-target'),item:v(c,'.wc-item'),aspect:v(c,'.wc-aspect'),folder:v(c,'.wc-folder'),model:v(c,'.wc-model'),texture:v(c,'.wc-tex')};
-  if(k==='wizspawndex') return {kind:'wizspawndex',pokemon:v(c,'.ws-mon'),namespace:v(c,'.ws-ns'),biomes:v(c,'.ws-biomes'),bucket:v(c,'.ws-bucket'),pos:v(c,'.ws-pos'),level:v(c,'.ws-level'),timeRange:v(c,'.ws-time'),dexId:v(c,'.ws-dexid'),region:v(c,'.ws-region')};
-  if(k==='wizevolution') return {kind:'wizevolution',target:v(c,'.we-target'),result:v(c,'.we-result'),evoKind:v(c,'.we-kind'),minLevel:v(c,'.we-level'),item:v(c,'.we-item'),amount:v(c,'.we-amount'),learnableMoves:v(c,'.we-moves'),setPreEvo:c.querySelector('.we-preevo').checked};
+  if(k==='wizcosmetic'){ const f=c._files||{}; const sp=((v(c,'.wc-target').split(':').pop())||'').toLowerCase().replace(/[^a-z0-9_]/g,'');
+    const itemRaw=v(c,'.wc-item'); const itemName=(itemRaw.includes(':')?itemRaw.split(':').pop():itemRaw).toLowerCase();
+    const aspect=window.CSB.slug(v(c,'.wc-aspect'))||('cosmetic_item-'+itemName); const suffix=window.CSB.slug(aspect); const K=sp&&suffix?sp+'_'+suffix:'';
+    return {kind:'wizcosmetic',target:v(c,'.wc-target'),item:v(c,'.wc-item'),aspect:v(c,'.wc-aspect'),folder:v(c,'.wc-folder'),
+      model:(f.model&&K)?K:v(c,'.wc-model'), texture:(f.tex)?'':v(c,'.wc-tex'), poser:(f.anim&&K)?K:undefined, emissive:!!f.emissive}; }
+  if(k==='wizspawndex'){ const tri=x=>x==='true'?true:x==='false'?false:undefined;
+    return {kind:'wizspawndex',pokemon:v(c,'.ws-mon'),namespace:v(c,'.ws-ns'),biomes:v(c,'.ws-biomes'),bucket:v(c,'.ws-bucket'),pos:v(c,'.ws-pos'),level:v(c,'.ws-level'),weight:v(c,'.ws-weight'),timeRange:v(c,'.ws-time'),dexId:v(c,'.ws-dexid'),region:v(c,'.ws-region'),
+      minLight:v(c,'.ws-minlight'),maxLight:v(c,'.ws-maxlight'),minSkyLight:v(c,'.ws-minsky'),maxSkyLight:v(c,'.ws-maxsky'),minY:v(c,'.ws-miny'),maxY:v(c,'.ws-maxy'),canSeeSky:tri(v(c,'.ws-sky')),moonPhase:v(c,'.ws-moon'),isRaining:tri(v(c,'.ws-rain')),isThundering:tri(v(c,'.ws-thunder')),fluid:v(c,'.ws-fluid'),structures:v(c,'.ws-struct'),neededNearbyBlocks:v(c,'.ws-nearby')}; }
+  if(k==='wizevolution'){ const extra=(v(c,'.we-extra')||'').split(/\n+/).map(s=>s.trim()).filter(Boolean).map(s=>{try{return JSON.parse(s);}catch(e){return null;}}).filter(Boolean);
+    return {kind:'wizevolution',target:v(c,'.we-target'),result:v(c,'.we-result'),evoKind:v(c,'.we-kind'),minLevel:v(c,'.we-level'),item:v(c,'.we-item'),amount:v(c,'.we-amount'),
+      timeRange:v(c,'.we-time'),biome:v(c,'.we-biome'),heldItem:v(c,'.we-held'),consumeHeldItem:c.querySelector('.we-consume').checked,extraRequirements:extra,
+      learnableMoves:v(c,'.we-moves'),setPreEvo:c.querySelector('.we-preevo').checked}; }
   if(k==='dexentryaddition') return {kind:'dexentryaddition',entryId:v(c,'.dea-id'),forms:v(c,'.dea-forms')};
   if(k==='pokemoninteraction') return {kind:'pokemoninteraction',target:v(c,'.pi-target'),grouping:v(c,'.pi-group'),heldItem:v(c,'.pi-held'),cooldown:v(c,'.pi-cd'),effects:rows(c,'.ireffect').map(e=>({variant:v(e,'.ie-var'),item:v(e,'.ie-item'),sound:v(e,'.ie-sound')}))};
   if(k==='globalfeature') return {kind:'globalfeature',key:v(c,'.gf-key'),type:v(c,'.gf-type'),default:(v(c,'.gf-type')==='choice'?v(c,'.gf-cdef'):v(c,'.gf-def')),min:v(c,'.gf-min'),max:v(c,'.gf-max'),choices:v(c,'.gf-choices')};
@@ -1999,7 +2110,7 @@ async function generate(){
   if(badIds.length){ if(!confirm('Hay ids que no reconozco en Cobblemon (pueden ser de otro mod, nuevos, o erratas):\n\n• '+badIds.slice(0,15).join('\n• ')+(badIds.length>15?'\n…y '+(badIds.length-15)+' más':'')+'\n\n¿Generar igualmente?')) return; }
   const mode=$('mEx').checked?'existing':'new';
   const target=mode==='existing'?{mode,path:$('exPath').value}:{mode,parent:$('newParent').value,name:$('newName').value,desc:$('newDesc').value,packFormat:$('newPF').value};
-  const rawFiles=[]; document.querySelectorAll('#cards > .card').forEach(c=>{ if(c._rawFiles&&c._rawFiles.length) rawFiles.push(...c._rawFiles); });
+  const rawFiles=await finalizeAssets();
   const ow=$('overwrite').checked;
   try{ const dry=await(await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target,items,rawFiles,dryRun:true})})).json();
     if(dry.errors&&dry.errors.length){ alert('⚠ Revisa estos bloques antes de generar:\n• '+dry.errors.join('\n• ')); return; }
@@ -2198,7 +2309,7 @@ async function renderPackHome(){
   let h='<div class="ph-hero"><div class="logo"></div><div><h2>'+esc(name)+'</h2><div class="sub">'+esc(lastRoot||'')+'</div></div><div class="ph-total"><b>'+((d&&d.total)||0)+'</b><span>elementos</span></div></div>';
   if(!d||!d.exists||!d.total){ h+='<div class="ph-empty"><div class="pokeball-deco" style="width:120px;height:120px;opacity:.13;margin:0 auto 18px"></div>Tu pack está vacío.<br>Usa <b>Crear</b> en el menú para añadir tu primer Pokémon, objeto o aspecto.</div>'; box.innerHTML=h; return; }
   h+='<div class="pk-split"><aside class="pk-tree" id="pkTree"></aside><section class="pk-right"><div class="pk-tabs" id="pkTabs"></div><div class="pk-insp" id="pkInsp"></div></section></div>';
-  h+='<div style="margin-top:12px;display:flex;gap:8px"><button class="btn small" onclick="apiPost(\'/api/open\',{path:lastRoot})">📂 Abrir carpeta</button><button class="btn small" onclick="navExport()">📦 Exportar .zip</button></div>';
+  h+='<div style="margin-top:12px;display:flex;gap:8px"><button class="btn small" onclick="pkVerify()">🔍 Verificar</button><button class="btn small" onclick="apiPost(\'/api/open\',{path:lastRoot})">📂 Abrir carpeta</button><button class="btn small" onclick="navExport()">📦 Exportar .zip</button></div>';
   box.innerHTML=h;
   buildPkTree(d);
   if(!fresh && pkTabs.length){ renderTabs(); if(pkActiveRel) activateTab(encodeURIComponent(pkActiveRel)); else pkOverview(d); }
@@ -2245,6 +2356,28 @@ function pkOverview(d){
   h+='</div>'; insp.innerHTML=h;
 }
 function pkInspect(relEnc,cat){ openTab(relEnc,cat); }   // compat
+// Verifica el pack y muestra el informe en el panel derecho del inspector
+async function pkVerify(){
+  const insp=$('pkInsp'); if(!insp||!lastRoot) return;
+  pkActiveRel=null; renderTabs(); document.querySelectorAll('#pkTree .pk-item.active').forEach(x=>x.classList.remove('active'));
+  insp.innerHTML='<div class="pk-insp-head"><span class="e">🔍</span><b>Verificación</b></div><div class="muted" style="padding:16px">Verificando…</div>';
+  let r; try{ r=await apiPost('/api/packverify',{path:lastRoot}); }catch(e){ insp.innerHTML='<div class="muted" style="padding:16px">No se pudo verificar.</div>'; return; }
+  if(!r||!r.exists){ insp.innerHTML='<div class="muted" style="padding:16px">El pack no existe.</div>'; return; }
+  const chk=r.checklist||[]; const c=r.counts||{error:0,warn:0};
+  let h='<div class="pk-insp-head"><span class="e">🔍</span><b>Verificación del pack</b><span class="meta">'+(c.error?('✗ '+c.error+'  '):'')+'⚠ '+c.warn+'</span></div><div style="padding:16px">';
+  if(r.issues&&r.issues.length){
+    h+='<div class="vbox"><div class="vhead"><b>'+(c.error?'<span class="verr">✗ '+c.error+' error(es)</span> · ':'')+'<span class="vwarn">⚠ '+c.warn+' aviso(s)</span></b></div>';
+    r.issues.forEach(i=>{ h+='<div class="vissue '+i.level+'">'+(i.level==='error'?'✗':'⚠')+' '+esc(i.msg)+(i.file?' <span class="vf">'+esc(i.file)+'</span>':'')+'</div>'; });
+    h+='<div class="muted" style="font-size:11.5px;margin-top:6px">Los <b>errores</b> rompen cómo se ve/funciona; los <b>avisos</b> conviene revisarlos.</div></div>';
+  } else { h+='<div class="vok">✅ Todo en orden: no se han encontrado fallos.</div>'; }
+  if(chk.length){
+    h+='<div class="vbox" style="margin-top:10px"><div class="vhead"><b>📦 Lo que tienes que aportar tú ('+chk.length+')</b></div>'+
+       '<div class="muted" style="font-size:11.5px;margin-bottom:6px">Estos archivos los creas tú (Blockbench / editor de imagen). Cópialos en la ruta indicada, dentro de la carpeta del pack.</div>';
+    chk.forEach(it=>{ h+='<div class="chkrow"><span class="chkkind">'+esc(it.kind)+'</span><code class="chkpath">'+esc(it.path)+'</code>'+(it.hint?'<span class="chkhint">'+esc(it.hint)+'</span>':'')+'<button class="small chkcopy" onclick="copyText(this,\''+encodeURIComponent(it.path)+'\')">📋 copiar</button></div>'; });
+    h+='</div>';
+  }
+  h+='</div>'; insp.innerHTML=h;
+}
 function jsonHL(obj){
   let s=JSON.stringify(obj,null,2).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   return s.replace(/("(?:\\.|[^"\\])*"(\s*:)?|\b(?:true|false)\b|\bnull\b|-?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)/g, m=>{
@@ -2342,9 +2475,156 @@ function assistant(id){ const a=ASSIST[id]; if(!a){ navGoal(id); return; } if(!l
 function assistantRender(id){ const a=ASSIST[id]; if(!a) return;
   revealEditor(); document.body.classList.add('assist'); $('cards').innerHTML=''; addCard(a.kind); assistKind=a.kind;
   $('assistTitle').textContent='✨ '+a.title; const g=$('btnGen'); if(g) g.textContent='✓ Crear y añadir al pack';
-  setActiveNav(id); window.scrollTo({top:0,behavior:'smooth'}); }
-function exitAssist(){ document.body.classList.remove('assist'); const g=$('btnGen'); if(g) g.textContent='Generar'; }
+  setActiveNav(id);
+  asstCurId=id;
+  const model=!!ASST_MODEL[id]; document.body.classList.toggle('asst-model', model);
+  const pick=$('asstPicker');
+  if(model){ if(pick) pick.innerHTML=asstPickerHTML(); const right=$('asstRight'); if(right && !right.dataset.ready){ right.innerHTML=asstStageHTML(); right.dataset.ready='1'; }
+    asstEnsure3D(); asstClearModel(); asstLoadModels(); const s=$('asstSearch'); if(s) s.value=''; const hud=$('asstHud'); if(hud) hud.textContent='elige un Pokémon'; }
+  else if(pick){ pick.innerHTML=''; }
+  window.scrollTo({top:0,behavior:'smooth'}); }
+function exitAssist(){ document.body.classList.remove('assist','asst-model'); const g=$('btnGen'); if(g) g.textContent='Generar'; }
 function assistAgain(){ $('assistDone').classList.add('hide'); if(assistKind){ $('cards').innerHTML=''; addCard(assistKind); window.scrollTo({top:0,behavior:'smooth'}); } }
+
+// ===== Visor 3D del asistente (tipos que tocan un Pokémon) =====
+// id de asistente -> campo de especie del formulario (+ carpeta) y formato del valor
+const ASST_MODEL={
+  variante:   {targetSel:'.g-target',  fmt:'ns',   folderSel:'.g-folder'},
+  complemento:{targetSel:'.wc-target', fmt:'ns',   folderSel:'.wc-folder'},
+  evolucion:  {targetSel:'.we-target', fmt:'ns'},
+  aparezca:   {targetSel:'.ws-mon',    fmt:'name'},
+  montar:     {targetSel:'.m-target',  fmt:'ns'},
+  pokedex:    {targetSel:'.e-species', fmt:'ns'},
+};
+let asstCurId=null, asstModels=[], asst3dReady=false, asstSpin=true, asstAnimOn=true;
+let asstScene,asstCam,asstRenderer,asstControls,asstCanvas,asstCurrent=null,asstClip=null,asstAnimStart=0;
+function asstPickerHTML(){
+  return '<label class="lab" style="margin:0 0 6px">Elige el Pokémon (se previsualiza a la derecha)</label>'+
+    '<input id="asstSearch" placeholder="🔍 Buscar Pokémon…" oninput="asstFilter(this.value)"><div id="asstList"><div class="mrow full">Cargando…</div></div>';
+}
+function asstStageHTML(){
+  return '<div class="asst3d-stage"><canvas id="asstCanvas"></canvas><div class="viewer-toolbar"><button class="btn small" id="asstAnimBtn" onclick="asstToggleAnim()" title="animación">▶</button><button class="btn small" onclick="asstSpin=!asstSpin" title="girar">↻</button></div><div id="asstHud" class="hud">elige un Pokémon</div></div>';
+}
+function asstEnsure3D(){
+  if(asst3dReady) return; asstCanvas=$('asstCanvas'); if(!asstCanvas||!window.THREE) return;
+  asstScene=new THREE.Scene(); asstScene.background=new THREE.Color('#15110d');
+  asstCam=new THREE.PerspectiveCamera(45,1,0.1,5000); asstCam.position.set(0,20,60);
+  asstRenderer=new THREE.WebGLRenderer({canvas:asstCanvas,antialias:true}); asstRenderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  asstControls=new THREE.OrbitControls(asstCam,asstCanvas); asstControls.enableDamping=true;
+  asstScene.add(new THREE.AmbientLight(0xffffff,0.85)); const dl=new THREE.DirectionalLight(0xffffff,0.85); dl.position.set(40,80,50); asstScene.add(dl);
+  asstScene.add(new THREE.GridHelper(64,16,0x3a3026,0x2f261d));
+  asst3dReady=true; requestAnimationFrame(asstLoop);
+}
+function asstLoop(){ if(!asst3dReady) return; requestAnimationFrame(asstLoop);
+  if(!document.body.classList.contains('asst-model')) return;   // pausa cuando el visor no se ve
+  const w=asstCanvas.clientWidth,h=asstCanvas.clientHeight; if(w&&h&&(asstCanvas.width!==w||asstCanvas.height!==h)){ asstRenderer.setSize(w,h,false); asstCam.aspect=w/h; asstCam.updateProjectionMatrix(); }
+  if(asstCurrent){ if(asstAnimOn&&asstClip) window.applyAnimClip(asstCurrent,asstClip,(performance.now()-asstAnimStart)/1000); if(asstSpin) asstCurrent.rotation.y+=0.01; }
+  asstControls.update(); asstRenderer.render(asstScene,asstCam);
+}
+async function asstLoadModels(){ if(asstModels.length){ asstRenderList(asstModels); return; }
+  const r=await fetch('/api/preview/models').then(r=>r.json()).catch(()=>({models:[]})); asstModels=r.models||[]; asstRenderList(asstModels); }
+function asstRenderList(ms){ const el=$('asstList'); if(!el) return; if(!ms.length){ el.innerHTML='<div class="mrow full">sin resultados</div>'; return; }
+  el.innerHTML=''; for(const m of ms.slice(0,1000)){ const d=document.createElement('div'); d.className='mrow'; d.title=m.name;
+    d.innerHTML='<span>'+m.name.replace(/_/g,' ')+'</span>'+(m.gen?'<span class="tag">'+m.gen+'</span>':'');
+    d.onclick=()=>{ document.querySelectorAll('#asstList .mrow.active').forEach(x=>x.classList.remove('active')); d.classList.add('active'); asstPick(m); }; el.appendChild(d); } }
+function asstFilter(q){ q=(q||'').toLowerCase(); asstRenderList(asstModels.filter(m=>m.name.toLowerCase().includes(q))); }
+function asstFolderOf(m){ const p=String(m.geo||'').split('/'); return p.length>=2?p[p.length-2]:''; }
+function asstFillTarget(m){ const cfg=ASST_MODEL[asstCurId]; if(!cfg) return; const card=$('cards').querySelector('.card'); if(!card) return;
+  const t=card.querySelector(cfg.targetSel); if(t){ t.value=(cfg.fmt==='ns'?'cobblemon:':'')+m.name; t.dispatchEvent(new Event('input',{bubbles:true})); }
+  if(cfg.folderSel){ const f=card.querySelector(cfg.folderSel); if(f && !f.value){ f.value=asstFolderOf(m); } } }
+let asstCurGeo=null, asstCurDefTex=null, asstUserTex=null, asstCurAnim=null;
+function asstLoadTex(url){ return new Promise(res=>{ if(!url) return res(null); new THREE.TextureLoader().load(url,t=>res(t),undefined,()=>res(null)); }); }
+async function asstRenderModel(){ if(!asst3dReady||!asstCurGeo) return; const tex=await asstLoadTex(asstUserTex||asstCurDefTex);
+  if(asstCurrent) asstScene.remove(asstCurrent);
+  try{ asstCurrent=window.geoToThreeGroup(asstCurGeo,tex); asstClip=asstCurAnim?window.buildAnimClip(asstCurAnim):null; asstAnimStart=performance.now(); asstScene.add(asstCurrent);
+    const b=new THREE.Box3().setFromObject(asstCurrent),c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3());
+    asstCurrent.position.sub(c); asstCurrent.position.y+=s.y/2; const rad=Math.max(s.x,s.y,s.z)||16;
+    asstCam.position.set(rad*1.25,s.y*0.65+rad*0.45,-rad*1.7); asstControls.target.set(0,s.y*0.45,0); asstControls.update();
+  }catch(e){ const hud=$('asstHud'); if(hud) hud.textContent='error: '+e.message; } }
+async function asstPick(m){ const hud=$('asstHud'); if(hud) hud.textContent='cargando '+m.name+'…';
+  const r=await fetch('/api/preview/model?geo='+encodeURIComponent(m.geo)).then(r=>r.json()).catch(()=>({error:'no se pudo cargar el modelo'}));
+  if(r.error){ if(hud) hud.textContent=r.error; return; }
+  asstEnsure3D(); if(!asst3dReady) return;
+  asstCurGeo=r.geo; asstCurDefTex=r.texture||null; asstCurAnim=r.animation||null;
+  await asstRenderModel(); if(hud) hud.textContent=m.name+(asstUserTex?' · tu textura':'');
+  asstFillTarget(m);
+}
+async function asstApplyUserTex(url){ asstUserTex=url; asstEnsure3D(); if(asstCurGeo){ await asstRenderModel(); const hud=$('asstHud'); if(hud) hud.textContent='vista con tu textura'; } }
+async function asstShowGeo(geo,animation){ asstEnsure3D(); if(!asst3dReady) return; asstCurGeo=geo; asstCurAnim=animation||null; await asstRenderModel(); const hud=$('asstHud'); if(hud) hud.textContent='modelo importado'; }
+function asstClearModel(){ if(asstCurrent&&asstScene){ asstScene.remove(asstCurrent); } asstCurrent=null; asstCurGeo=null; asstCurDefTex=null; asstUserTex=null; asstCurAnim=null; asstClip=null; }
+function asstToggleAnim(){ asstAnimOn=!asstAnimOn; const b=$('asstAnimBtn'); if(b) b.textContent=asstAnimOn?'▶':'⏸'; if(!asstAnimOn&&asstCurrent) window.resetToRest(asstCurrent); }
+
+// ===== Subida de archivos en asistentes + escritura en el pack =====
+function asstGeoRoot(g){ try{ const bs=g['minecraft:geometry'][0].bones||[]; const r=bs.find(b=>!b.parent); return (r&&r.name)||(bs[0]&&bs[0].name)||''; }catch(e){ return ''; } }
+function asstReadDataURL(file){ return new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(file); }); }
+async function asstFile(input,type){
+  const file=input.files&&input.files[0]; if(!file) return; const c=input.closest('.card'); if(!c) return;
+  c._files=c._files||{}; c._files[type]=file;
+  if(type==='model'){ try{ const g=JSON.parse(await file.text()); c._modelGeo=g; c._modelRoot=asstGeoRoot(g); asstShowGeo(g,null); }catch(e){ alert('El .geo.json no es válido'); c._files[type]=null; input.value=''; return; } }
+  if(type==='anim'){ try{ JSON.parse(await file.text()); }catch(e){ alert('La animación .json no es válida'); c._files[type]=null; input.value=''; return; } }
+  if(type==='tex'){ asstApplyUserTex(await asstReadDataURL(file)); }
+  const el=c.querySelector('.asst-files'); if(el){ const f=c._files, lab={tex:'textura',shiny:'shiny',emissive:'emisiva',model:'modelo',anim:'animación'};
+    const got=['tex','shiny','emissive','model','anim'].filter(k=>f[k]).map(k=>lab[k]); el.innerHTML=got.length?('✓ '+got.join(' · ')+' adjunto(s)'):'Sin archivos.'; }
+}
+function renameAnimGroupK(anim,K){ if(!anim||!anim.animations) return anim; const out={}; for(const k in anim.animations){ const m=k.match(/^animation\.[^.]+\.(.+)$/); out[m?('animation.'+K+'.'+m[1]):k]=anim.animations[k]; } return Object.assign({},anim,{animations:out}); }
+async function finalizeAssets(){ const out=[];
+  for(const c of document.querySelectorAll('#cards > .card')){
+    if(c._rawFiles&&c._rawFiles.length) out.push(...c._rawFiles);
+    out.push(...await resourceFiles(c));   // resource pack genérico (filas .res-row de cualquier apartado)
+    if(c._files){
+      if(c.dataset.kind==='wizregional') out.push(...await regionalAssets(c));
+      else if(c.dataset.kind==='wizcosmetic') out.push(...await cosmeticAssets(c));
+      else if(c.dataset.kind==='mark') out.push(...await markAssets(c));
+    }
+  }
+  return out;
+}
+async function markAssets(c){ const f=c._files||{}; if(!f.markicon) return [];
+  const ns=window.CSB.slug(v(c,'.r-ns'))||'cobblemon'; const name=window.CSB.slug(v(c,'.r-name')); if(!name) return [];
+  return [{rel:`assets/${ns}/textures/gui/mark/${name}.png`, base64:await fileB64(f.markicon)}];
+}
+// ===== Resource pack genérico: cada apartado de objeto puede aportar texturas/modelos =====
+const RES_CFG={
+  berry:{nameSel:'.y-name', tex:'assets/cobblemon/textures/item/berries'},
+  pokerod:{nameSel:'.k-ball', tex:'assets/cobblemon/textures/item'},
+  fossil:{nameSel:'.o-result', tex:'assets/cobblemon/textures/item'},
+  seasoning:{nameSel:'.se-ing', tex:'assets/cobblemon/textures/item'},
+  naturalmaterial:{nameSel:'.nm-file', tex:'assets/cobblemon/textures/item'},
+  recipe:{nameSel:'.rc-name', tex:'assets/cobblemon/textures/item'},
+};
+function resourceSectionHTML(){ return '<fieldset class="asst-assets res-sec"><legend>🎨 Resource pack (texturas/modelos, opcional)</legend><div class="res-rows"></div><button type="button" class="btn small" onclick="resAddRow(this)">+ Añadir archivo</button><p class="hint">Sube una textura .png o un modelo .json; la ruta se sugiere sola al elegir y puedes editarla.</p></fieldset>'; }
+function resAddRow(btn){ const rows=btn.parentElement.querySelector('.res-rows'); const d=document.createElement('div'); d.className='res-row';
+  d.innerHTML='<label class="btn small">📎 Archivo<input type="file" accept=".png,.json" onchange="resRowFile(this)"></label><input type="text" class="res-path" placeholder="ruta destino (auto al elegir)"><button type="button" class="btn small del" title="quitar" onclick="this.closest(\'.res-row\').remove()">✕</button>'; rows.appendChild(d); }
+function resName(c){ const cfg=RES_CFG[c&&c.dataset.kind]; if(!cfg) return ''; let n=v(c,cfg.nameSel)||''; n=n.includes(':')?n.split(':').pop():n; return window.CSB.slug(n); }
+function resSuggestPath(row,f){ const c=row.closest('.card'); const cfg=RES_CFG[c&&c.dataset.kind]||{tex:'assets/cobblemon/textures/item'};
+  const base=f.name.replace(/\.(png|geo\.json|json)$/i,''); const name=resName(c)||window.CSB.slug(base)||'item'; const low=f.name.toLowerCase();
+  if(low.endsWith('.png')) return cfg.tex+'/'+name+'.png';
+  if(low.endsWith('.geo.json')) return 'assets/cobblemon/bedrock/pokemon/models/'+name+'/'+f.name;
+  if(low.endsWith('.json')) return 'assets/cobblemon/models/item/'+name+'.json';
+  return 'assets/cobblemon/'+f.name; }
+function resRowFile(input){ const f=input.files&&input.files[0]; const row=input.closest('.res-row'); if(!f||!row) return; row._file=f;
+  const p=row.querySelector('.res-path'); if(p && !p.value) p.value=resSuggestPath(row,f); }
+async function resourceFiles(c){ const out=[]; for(const row of c.querySelectorAll('.res-row')){ const f=row._file; if(!f) continue;
+  const p=row.querySelector('.res-path'); const rel=(p&&p.value.trim())||resSuggestPath(row,f); if(!rel) continue;
+  if(f.name.toLowerCase().endsWith('.png')) out.push({rel, base64:await fileB64(f)}); else out.push({rel, text:await f.text()}); }
+  return out; }
+// escribe textura/emisiva/modelo/animación(+poser) de un aspecto en sus rutas (común a forma regional y cosmético)
+async function writeAspectAssets(c, ns, sp, suffix, folder){ const f=c._files||{}; const files=[]; const K=sp+'_'+suffix;
+  const texRoot=`assets/${ns}/textures/pokemon/${folder}`, bed=`assets/${ns}/bedrock/pokemon`;
+  if(f.tex)      files.push({rel:`${texRoot}/${sp}_${suffix}.png`, base64:await fileB64(f.tex)});
+  if(f.emissive) files.push({rel:`${texRoot}/${sp}_${suffix}_emissive.png`, base64:await fileB64(f.emissive)});
+  if(f.model && c._modelGeo){ const g=JSON.parse(JSON.stringify(c._modelGeo)); try{ g['minecraft:geometry'][0].description.identifier='geometry.'+K; }catch(e){} files.push({rel:`${bed}/models/${folder}/${K}.geo.json`, text:JSON.stringify(g,null,2)}); }
+  if(f.anim){ let a=JSON.parse(await f.anim.text()); a=renameAnimGroupK(a,K); files.push({rel:`${bed}/animations/${folder}/${K}.animation.json`, text:JSON.stringify(a,null,2)});
+    try{ const pf=window.CSB.BUILDERS.poser({namespace:ns,species:K,folder,rootBone:c._modelRoot||K}); for(const p of pf) files.push({rel:p.rel, text:JSON.stringify(p.obj,null,2)}); }catch(e){} }
+  return files;
+}
+async function regionalAssets(c){ const target=(v(c,'.g-target')||'').toLowerCase(); const ns=target.includes(':')?target.split(':')[0]:'cobblemon';
+  const sp=((target.split(':').pop())||'').replace(/[^a-z0-9_]/g,''); const suffix=window.CSB.slug(v(c,'.g-aspect'))||'regional'; const folder=window.CSB.slug(v(c,'.g-folder'))||sp;
+  return writeAspectAssets(c, ns, sp, suffix, folder); }
+async function cosmeticAssets(c){ const target=(v(c,'.wc-target')||'').toLowerCase(); const ns=target.includes(':')?target.split(':')[0]:'cobblemon';
+  const sp=((target.split(':').pop())||'').replace(/[^a-z0-9_]/g,''); const itemRaw=(v(c,'.wc-item')||''); const itemName=(itemRaw.includes(':')?itemRaw.split(':').pop():itemRaw).toLowerCase();
+  const aspect=window.CSB.slug(v(c,'.wc-aspect'))||('cosmetic_item-'+itemName); const suffix=window.CSB.slug(aspect); const folder=window.CSB.slug(v(c,'.wc-folder'))||sp;
+  return writeAspectAssets(c, ns, sp, suffix, folder); }
 function assistDone(r){ const n=(s)=>(r.results||[]).filter(x=>x.status===s).length; const ok=n('written')+n('merged'); $('assistDoneMsg').textContent=ok+' archivo(s) creados/actualizados en tu pack.'; $('assistDone').classList.remove('hide'); }
 function navExport(){ openAppTab('exportar','Exportar .zip','⬇️',()=>{ revealEditor(); setActiveNav('exportar'); const f=document.querySelector('.foot'); if(f) f.scrollIntoView({behavior:'smooth'}); }); }
 function navGuide(){ openAppTab('guia','Guía','📖',()=>{ openGuide(); setActiveNav('guia'); }); }

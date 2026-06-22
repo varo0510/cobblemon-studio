@@ -15,6 +15,18 @@ Construida con [Tauri](https://tauri.app/) (binario nativo ligero, ~6 MB de inst
 
 Descarga el instalador más reciente desde [**Releases**](../../releases/latest).
 
+### ⚠️ Aviso de Windows (SmartScreen) al instalar
+
+Al abrir el instalador, Windows mostrará **"Windows protegió su PC" / "Editor desconocido"**. Es **normal y esperado**: la app es nueva y todavía no está firmada con un certificado de pago; no significa que sea peligrosa (el código es público en este repositorio).
+
+Para instalar igualmente:
+
+1. En la ventana azul *"Windows protegió su PC"* → pulsa **Más información**.
+2. Aparecerá el botón **Ejecutar de todas formas** → púlsalo.
+3. (En el navegador, si bloquea la descarga: menú **···** del archivo → **Conservar** → **Conservar de todas formas**.)
+
+El aviso se irá reduciendo a medida que más gente la descargue. Más adelante el instalador podría firmarse para que no aparezca.
+
 ## Desarrollo
 
 ```bash
