@@ -191,6 +191,11 @@
   .appmain.packfull #packHome{border:0;border-radius:0;margin:0;padding:10px 12px;height:100%;display:flex;flex-direction:column;background:transparent}
   .appmain.packfull #packHomeBody{flex:1;min-height:0;display:flex;flex-direction:column}
   .appmain.packfull .pk-split{flex:1;height:auto;min-height:0;margin-top:10px}
+  /* aviso de auto-actualización (esquina inferior derecha) */
+  .upd-banner{position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;align-items:center;gap:10px;
+    background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;
+    box-shadow:0 10px 34px rgba(0,0,0,.55);font-size:12.5px;color:var(--text);max-width:340px}
+  .upd-banner.hide{display:none}
   /* modeswitch: segmented control de botones (la nav de studio.css estiliza <a>) */
   .modeswitch.nav button{border:none;border-right:1px solid var(--line);border-radius:0;background:transparent;
     color:var(--dim);padding:6px 12px;font-size:12px;font-weight:600}
@@ -365,6 +370,11 @@
   </div>
 </header>
 <div class="apptabs" id="appTabbar"></div>
+<div id="updBanner" class="upd-banner hide">
+  <span id="updMsg"></span>
+  <button class="btn small primary" onclick="updRestart()">Reiniciar</button>
+  <button class="btn small" onclick="$('updBanner').classList.add('hide')">Luego</button>
+</div>
 <div class="app-shell">
 <aside class="appside" id="appside">
   <a class="snav-item top" data-nav="inicio" onclick="navHome()">
@@ -2382,6 +2392,18 @@ async function restoreOrLaunch(){
 
 setupTabs();
 restoreNavCats();
+// auto-actualización: comprueba GitHub Releases al arrancar; si instala algo, ofrece reiniciar
+async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+async function checkForUpdates(){
+  try{ const r=await csInvoke('check_and_update');
+    if(typeof r==='string' && r.indexOf('updated')===0){
+      const ver=r.split(':')[1]||''; const b=$('updBanner');
+      if(b){ $('updMsg').textContent='✓ Actualización '+(ver?('v'+ver+' '):'')+'lista. Reiniciar para aplicar.'; b.classList.remove('hide'); }
+    }
+  }catch(e){ /* sin red / sin release todavía → silencioso */ }
+}
+function updRestart(){ csInvoke('restart_app').catch(()=>{}); }
+checkForUpdates();
 try{ if(localStorage.getItem('gd_side')==='1') $('appside').classList.add('collapsed'); }catch(e){}
 (function(){ let m='easy'; try{ m=localStorage.getItem('gd_mode')||'easy'; }catch(e){} setMode(m); })();
 checkResume();

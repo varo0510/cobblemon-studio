@@ -22,8 +22,17 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/varo0510/cobblemon-studio/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJCQTc3OTAxQjk1N0RGMzAKUldRdzMxZTVBWG1udXpvLys0ckJGR2svTXdYdUZwcHVFY3NLVnhCTDdtZWhCMlovM0twbXJRNHAK"
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",

@@ -1,0 +1,49 @@
+name: release
+
+# Publica una release firmada al hacer push de una etiqueta vX.Y.Z.
+# GitHub compila en Windows (MSVC), firma con la clave del updater y sube
+# el instalador NSIS + latest.json → los usuarios se autoactualizan al abrir.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust (stable, MSVC)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache de Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Dependencias frontend
+        run: npm ci
+
+      - name: Build + firma + Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Cobblemon Studio ${{ github.ref_name }}'
+          releaseBody: 'Descarga el instalador. A partir de esta versión la app se autoactualiza al abrir.'
+          releaseDraft: false
+          prerelease: false

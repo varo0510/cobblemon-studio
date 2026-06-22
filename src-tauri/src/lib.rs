@@ -416,16 +416,46 @@ fn update_assets() -> Value {
     }
 }
 
+// ===== AUTO-UPDATE (Tauri updater) =====
+// Comprueba GitHub Releases; si hay versión nueva la descarga e instala (NSIS, sin UAC en
+// instalación por-usuario). Errores (sin red / aún sin release) se devuelven como texto, NO rompen el arranque.
+#[tauri::command]
+async fn check_and_update(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => return Ok(format!("disabled:{e}")),
+    };
+    match updater.check().await {
+        Ok(Some(update)) => {
+            let ver = update.version.clone();
+            match update.download_and_install(|_chunk, _total| {}, || {}).await {
+                Ok(_) => Ok(format!("updated:{ver}")),
+                Err(e) => Ok(format!("error:{e}")),
+            }
+        }
+        Ok(None) => Ok("none".into()),
+        Err(e) => Ok(format!("error:{e}")),
+    }
+}
+
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // (sin auto-abrir DevTools: la app arranca limpia)
         .invoke_handler(tauri::generate_handler![
             pick_folder, project_create, project_open, pack_info, list_models,
             get_model, write_pack, build_zips, open_folder, update_assets,
-            pack_detail, read_pack_file, read_pack_image, delete_file, pack_verify, write_file
+            pack_detail, read_pack_file, read_pack_image, delete_file, pack_verify, write_file,
+            check_and_update, restart_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

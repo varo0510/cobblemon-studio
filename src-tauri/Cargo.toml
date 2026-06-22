@@ -28,4 +28,5 @@ ureq = "2"
 base64 = "0.22"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 walkdir = "2"
+tauri-plugin-updater = "2"
 
