@@ -14,8 +14,15 @@
 <script src="/vendor/gif-encoder.js"></script>
 <script src="/ctxmenu.js"></script>
 <style>
-  .ph{display:grid;grid-template-columns:248px 1fr 296px;height:100vh}
-  .ph-side{background:var(--panel);overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .ph{display:grid;grid-template-columns:248px 1fr 296px;grid-template-rows:minmax(0,1fr);height:100vh;overflow:hidden}
+  .ph-side{background:var(--panel);overflow-y:auto;overflow-x:hidden;min-height:0;padding:12px;display:flex;flex-direction:column;gap:8px;overscroll-behavior:contain}
+  .ph-side>*{flex:0 0 auto}   /* los hijos NO se encogen: desbordan y el panel scrollea (si se encogen, .acc overflow:hidden recorta el contenido)*/
+  .ph-center{min-height:0}
+  /* scrollbar fino y temático para los paneles laterales */
+  .ph-side::-webkit-scrollbar{width:10px}
+  .ph-side::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px;border:2px solid var(--panel);background-clip:padding-box}
+  .ph-side::-webkit-scrollbar-thumb:hover{background:var(--accent);background-clip:padding-box}
+  .ph-side::-webkit-scrollbar-track{background:transparent}
   .ph-right{padding:10px;gap:6px}
   /* secciones plegables (acordeón) */
   .acc{border:1px solid var(--line);border-radius:10px;background:var(--panel2);overflow:hidden}
@@ -56,6 +63,11 @@
   .bgmodes{display:flex;flex-wrap:wrap;gap:5px}
   .bgmodes .btn{flex:1;min-width:0;justify-content:center;padding:6px 4px;font-size:11.5px}
   .bgmodes .btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .bglib{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .bgthumb{position:relative;width:56px;height:40px;border-radius:6px;background-size:cover;background-position:center;border:1px solid var(--line2);cursor:pointer}
+  .bgthumb:hover{border-color:var(--accent)}
+  .bgthumb .bgx{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--err);color:#fff;font-size:10px;line-height:16px;text-align:center;opacity:0;transition:opacity .15s}
+  .bgthumb:hover .bgx{opacity:1}
   .ph .btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   .swrow{display:flex;gap:8px;align-items:center}
   .swrow input[type=color]{flex:1;height:30px;padding:2px}
@@ -80,6 +92,48 @@
   .bone-head .bx{color:var(--faint);font-weight:700;flex:0 0 auto;padding:0 2px}
   .bone-head .bx:hover{color:var(--err)}
   .bone-body{padding:2px 9px 8px}
+  /* ===== panel derecho con pestañas (distribución profesional) ===== */
+  .ph-right{display:flex;flex-direction:column;padding:0;gap:0;overflow:hidden}
+  .ph-right>*{flex:0 0 auto}
+  /* barra de pestañas: indicador inferior (no pastilla), icono sobre etiqueta */
+  #phTabs{display:flex;gap:0;flex-wrap:nowrap;border-bottom:1px solid var(--line);background:var(--panel)}
+  #phTabs .tab{flex:1;min-width:0;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:9px 2px 7px;font-size:10px;font-weight:600;background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;color:var(--dim);cursor:pointer;transition:color var(--t),border-color var(--t)}
+  #phTabs .tab .ic{width:17px;height:17px;flex:0 0 auto}
+  #phTabs .tab:hover{color:var(--text);background:transparent;transform:none}
+  #phTabs .tab.on{background:transparent;color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+  .ph-tabwrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:block;padding:0 14px 6px;overscroll-behavior:contain}
+  .ph-tabwrap>section[hidden]{display:none}
+  .ph-foot{flex:0 0 auto;border-top:1px solid var(--line);padding:11px 14px}
+  /* micro-secciones: cabecera tenue + separador fino + más aire entre grupos */
+  .grp{padding:18px 0;border-top:1px solid var(--line)}
+  .grp:first-child{border-top:0;padding-top:15px}
+  .sec-h{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--faint);margin:0 0 12px}
+  .grp .pl:first-child{margin-top:0}
+  .grp .pl{margin:13px 0 6px}
+  /* fila etiqueta-izquierda / control-derecha */
+  .field{display:flex;align-items:center;gap:10px;margin:10px 0}
+  .field>.lbl{flex:0 0 auto;font-size:12px;color:var(--dim)}
+  .field>select,.field>.seg,.field>input[type=text]{flex:1;min-width:0;width:auto}
+  /* segmentado UNIDO (bordes compartidos, anchos iguales) */
+  .seg{display:flex;gap:0}
+  .seg .btn{flex:1;justify-content:center;border-radius:0;margin-left:-1px}
+  .seg .btn:first-child{border-top-left-radius:var(--r1);border-bottom-left-radius:var(--r1);margin-left:0}
+  .seg .btn:last-child{border-top-right-radius:var(--r1);border-bottom-right-radius:var(--r1)}
+  .seg .btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);position:relative;z-index:1}
+  .anggrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+  .anggrid .btn{justify-content:center;padding:8px 4px;font-size:11.5px}
+  .ph .bgmodes{gap:7px}
+  .ph .qbtns{gap:7px}
+  .ph .btn.small{padding:7px 10px}
+  .ph .btn .ic{flex:0 0 auto}
+  .ph .acc{margin-top:6px}
+  /* lectura del tamaño de salida (chip de valor calculado) */
+  .outsize{font-size:11px;color:var(--dim);background:var(--bg2);border:1px solid var(--line);border-radius:var(--r1);padding:8px 10px;margin-top:10px;text-align:center;font-variant-numeric:tabular-nums}
+  .outsize b{color:var(--text);font-weight:700}
+  .ph-tabwrap::-webkit-scrollbar{width:10px}
+  .ph-tabwrap::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px;border:2px solid var(--panel);background-clip:padding-box}
+  .ph-tabwrap::-webkit-scrollbar-thumb:hover{background:var(--accent);background-clip:padding-box}
+  .ph-tabwrap::-webkit-scrollbar-track{background:transparent}
 </style></head>
 <body>
 <div class="ph">
@@ -100,98 +154,194 @@
       <button class="btn small on" id="gridBtn" onclick="toggleGrid()" title="Rejilla del suelo">Rejilla</button>
       <button class="btn small" id="cycBtn" onclick="toggleCyc(!cycOn)" title="Estudio: suelo y pared (ciclorama)">Estudio</button>
     </div>
-    <div class="ph-hud" id="hud">Arrastra para orbitar · rueda = zoom · clic en un Pokémon para seleccionarlo</div>
+    <div class="ph-hud" id="hud">Arrastra = orbitar · clic derecho + WASD = volar · rueda = zoom · clic en un Pokémon para seleccionarlo</div>
   </div>
 
   <aside class="ph-side ph-right">
-    <div class="acc" data-k="luz"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">💡</span>Iluminación<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
-      <div class="acc-b">
-        <div class="bgmodes" id="lightPresets">
-          <button class="btn small on" data-lp="studio" onclick="applyLightPreset('studio')">Estudio</button>
-          <button class="btn small" data-lp="retrato" onclick="applyLightPreset('retrato')">Retrato</button>
-          <button class="btn small" data-lp="cine" onclick="applyLightPreset('cine')">Cine</button>
-          <button class="btn small" data-lp="plano" onclick="applyLightPreset('plano')">Plano</button>
-        </div>
-        <label class="pl">Intensidad</label><div class="sline"><input type="range" min="0.3" max="2" step="0.05" value="1" oninput="setLightMul(this.value); $('liV').textContent=(+this.value).toFixed(2)+'×'"><span class="sv" id="liV">1.00×</span></div>
-        <div class="row2" style="margin-top:8px;gap:8px"><span class="muted">Temp.</span><select onchange="setTemp(this.value)" style="flex:1"><option value="neutra">Neutra</option><option value="calida">Cálida</option><option value="fria">Fría</option></select></div>
-        <label class="row2" style="font-size:12px;color:var(--dim);margin-top:8px"><input type="checkbox" id="shBox" checked onchange="toggleShadows(this.checked)"> Sombras</label>
-        <label class="row2" style="font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="toneBox" onchange="setTone(this.checked)"> Color cine (ACES)</label>
-        <div id="expBox" style="display:none"><label class="pl">Exposición</label><div class="sline"><input type="range" id="expRange" min="0.4" max="2.5" step="0.05" value="1" oninput="setExposure(this.value); $('exV').textContent=(+this.value).toFixed(2)"><span class="sv" id="exV">1.00</span></div></div>
-      </div>
+    <div class="tabs" id="phTabs">
+      <button class="tab on" data-tab="cam" onclick="switchTab('cam')"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.5h2l1-1.5h6l1 1.5h2v7H2z"/><circle cx="8" cy="9" r="2.4"/></svg><span>Cámara</span></button>
+      <button class="tab" data-tab="luz" onclick="switchTab('luz')"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.2 9.5A3.5 3.5 0 1 1 11 7c0 1.3-.7 2-1.3 2.6-.4.4-.7.8-.7 1.4H7c0-.6-.3-1-.7-1.4"/><path d="M6.3 13h3.4M6.8 14.4h2.4"/></svg><span>Luz</span></button>
+      <button class="tab" data-tab="fondo" onclick="switchTab('fondo')"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.2" y="3.2" width="11.6" height="9.6" rx="1.4"/><circle cx="5.6" cy="6.2" r="1.1"/><path d="M2.6 11.5 6 8.2l2.2 2 2.4-2.6 2.8 3.1"/></svg><span>Fondo</span></button>
+      <button class="tab" data-tab="marca" onclick="switchTab('marca')"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.4 2.5H13a.9.9 0 0 1 .9.9v4.6a1 1 0 0 1-.3.7l-5.1 5.1a1 1 0 0 1-1.4 0L2.7 9.3a1 1 0 0 1 0-1.4l5.1-5.1a1 1 0 0 1 .6-.3z"/><circle cx="11" cy="5" r=".9"/></svg><span>Marca</span></button>
+      <button class="tab" data-tab="export" onclick="switchTab('export')"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7.5M5.2 7.3 8 10l2.8-2.7"/><path d="M3 11.5v1.2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.2"/></svg><span>Salida</span></button>
     </div>
+    <div class="ph-tabwrap" id="phTabWrap">
 
-    <div class="acc collapsed" data-k="cam"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">🎥</span>Cámara<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
-      <div class="acc-b">
-        <div class="row2" style="gap:8px"><span class="muted">Tipo</span><select id="camType" onchange="setCamType(this.value)" style="flex:1"><option value="persp">Perspectiva</option><option value="ortho" selected>Ortográfica</option></select></div>
-        <label class="pl">Campo de visión (FOV)</label><div class="sline"><input type="range" id="fovRange" min="20" max="80" step="1" value="45" oninput="setFOV(this.value); $('fovV').textContent=this.value+'°'"><span class="sv" id="fovV">45°</span></div>
-        <label class="row2" style="font-size:12px;color:var(--dim);margin-top:8px"><input type="checkbox" id="aoBox" onchange="setAutoOrbit(this.checked)"> Giro automático</label>
-      </div>
-    </div>
+      <!-- ===== CÁMARA ===== -->
+      <section data-tab="cam">
+        <div class="grp">
+          <div class="sec-h">Vista</div>
+          <div class="anggrid">
+            <button class="btn small" onclick="camPreset('front')">Frontal</button>
+            <button class="btn small" onclick="camPreset('34')">¾</button>
+            <button class="btn small" onclick="camPreset('side')">Lateral</button>
+            <button class="btn small" onclick="camPreset('back')">Trasera</button>
+            <button class="btn small" onclick="camPreset('top')">Cenital</button>
+            <button class="btn small" onclick="camPreset('low')">Contrapicado</button>
+          </div>
+          <button class="btn small" onclick="frameAll()" style="width:100%;justify-content:center;margin-top:8px"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h2M3 3v2M13 3h-2M13 3v2M3 13h2M3 13v-2M13 13h-2M13 13v-2"/><circle cx="8" cy="8" r="2.2"/></svg>Encuadrar</button>
+        </div>
+        <div class="grp">
+          <div class="sec-h">Encuadre</div>
+          <label class="pl">Forma de la foto</label>
+          <select id="aspectSel" onchange="setAspect(this.value)" style="width:100%"><option value="">Libre (rellena el visor)</option><option value="1">Cuadrada 1:1</option><option value="1.7778">Horizontal 16:9</option><option value="0.5625">Vertical móvil 9:16</option><option value="0.8">Retrato 4:5</option><option value="1.5">Clásica 3:2</option></select>
+        </div>
+        <div class="acc collapsed" data-k="cam_adv"><div class="acc-h" onclick="toggleAcc(this)">Avanzado<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+          <div class="acc-b">
+            <label class="pl">Tipo de cámara</label>
+            <div class="seg" id="camTypeSeg"><button class="btn small on" data-val="ortho" onclick="pickCamType('ortho')"><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.2"/></svg>Plana</button><button class="btn small" data-val="persp" onclick="pickCamType('persp')"><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.8 8S4 4 8 4s6.2 4 6.2 4-2.2 4-6.2 4S1.8 8 1.8 8z"/><circle cx="8" cy="8" r="1.8"/></svg>Profundidad</button></div>
+            <label class="pl">Acercamiento (lente) <span class="muted" style="font-weight:400">— solo con profundidad</span></label><div class="sline"><input type="range" id="fovRange" min="20" max="80" step="1" value="45" oninput="setFOV(this.value); $('fovV').textContent=this.value+'°'"><span class="sv" id="fovV">45°</span></div>
+            <label class="row2" style="font-size:12px;color:var(--dim);margin-top:8px"><input type="checkbox" id="aoBox" onchange="setAutoOrbit(this.checked)"> Girar en bucle (vista previa)</label>
+          </div>
+        </div>
+      </section>
 
-    <div class="acc" data-k="fondo"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">🌅</span>Fondo y set<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
-      <div class="acc-b">
-        <div class="bgmodes" id="bgModes">
-          <button class="btn small on" data-bg="color" onclick="setBgMode('color')">Color</button>
-          <button class="btn small" data-bg="gradient" onclick="setBgMode('gradient')">Degradado</button>
-          <button class="btn small" data-bg="radial" onclick="setBgMode('radial')">Radial</button>
-          <button class="btn small" data-bg="image" onclick="setBgMode('image')">Imagen</button>
-          <button class="btn small" data-bg="transparent" onclick="setBgMode('transparent')">Transp.</button>
+      <!-- ===== LUZ ===== -->
+      <section data-tab="luz" hidden>
+        <div class="grp">
+          <div class="sec-h">Estilo</div>
+          <div class="bgmodes" id="lightPresets">
+            <button class="btn small on" data-lp="studio" onclick="applyLightPreset('studio')">Estudio</button>
+            <button class="btn small" data-lp="retrato" onclick="applyLightPreset('retrato')">Retrato</button>
+            <button class="btn small" data-lp="cine" onclick="applyLightPreset('cine')">Cine</button>
+            <button class="btn small" data-lp="plano" onclick="applyLightPreset('plano')">Plano</button>
+          </div>
         </div>
-        <label class="pl">Presets rápidos</label>
-        <div class="bgmodes">
-          <button class="btn small" onclick="bgPreset('sky')">Cielo</button>
-          <button class="btn small" onclick="bgPreset('sunset')">Atardecer</button>
-          <button class="btn small" onclick="bgPreset('night')">Noche</button>
-          <button class="btn small" onclick="bgPreset('white')">Blanco</button>
-          <button class="btn small" onclick="bgPreset('grass')">Hierba</button>
+        <div class="grp">
+          <div class="sec-h">Ajustes</div>
+          <label class="pl">Intensidad</label><div class="sline"><input type="range" min="0.3" max="2" step="0.05" value="1" oninput="setLightMul(this.value); $('liV').textContent=(+this.value).toFixed(2)+'×'"><span class="sv" id="liV">1.00×</span></div>
+          <label class="pl">Tono de luz</label>
+          <div class="seg" id="tempSeg"><button class="btn small on" data-val="neutra" onclick="pickTemp('neutra')">Neutra</button><button class="btn small" data-val="calida" onclick="pickTemp('calida')">Cálida</button><button class="btn small" data-val="fria" onclick="pickTemp('fria')">Fría</button></div>
+          <label class="row2" style="font-size:12px;color:var(--dim);margin-top:8px"><input type="checkbox" id="shBox" checked onchange="toggleShadows(this.checked)"> Sombras</label>
         </div>
-        <div id="bgColorBox"><label class="pl">Color</label><div class="swrow"><input type="color" id="bgColA" value="#1b1f27" oninput="applyBg()"></div></div>
-        <div id="bgGradBox" style="display:none"><label class="pl">Degradado (de arriba a abajo / centro a borde)</label><div class="swrow"><input type="color" id="bgColTop" value="#3a4a7a" oninput="applyBg()"><input type="color" id="bgColBot" value="#0e1014" oninput="applyBg()"></div></div>
-        <div id="bgImgBox" style="display:none">
-          <label class="btn small">🖼️ Subir imagen<input type="file" accept=".png,.jpg,.jpeg,.webp" onchange="onBgImage(this.files[0])"></label>
-          <label class="row2" style="margin-top:8px;font-size:12px;color:var(--dim)"><input type="checkbox" id="bgPano" onchange="applyBg()"> Panorama 3D (360°)</label>
+        <div class="acc collapsed" data-k="luz_adv"><div class="acc-h" onclick="toggleAcc(this)">Avanzado<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+          <div class="acc-b">
+            <label class="row2" style="font-size:12px;color:var(--dim)"><input type="checkbox" id="toneBox" onchange="setTone(this.checked)"> Look de cine (ACES)</label>
+            <div id="expBox" style="display:none"><label class="pl">Brillo de la escena</label><div class="sline"><input type="range" id="expRange" min="0.4" max="2.5" step="0.05" value="1" oninput="setExposure(this.value); $('exV').textContent=(+this.value).toFixed(2)"><span class="sv" id="exV">1.00</span></div></div>
+          </div>
         </div>
-        <div id="cycColorBox" style="display:none"><label class="pl">Color del estudio (ciclorama)</label><div class="swrow"><input type="color" id="cycColIn" value="#2a2e36" oninput="setCycColor(this.value)"></div></div>
-      </div>
-    </div>
+      </section>
 
-    <div class="acc collapsed" data-k="marca"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">🏷️</span>Marca y texto<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
-      <div class="acc-b">
-        <label class="pl">Título</label><input type="text" id="capTitle" placeholder="Nombre del diseño…" style="width:100%">
-        <label class="pl">Subtítulo</label><input type="text" id="capSub" placeholder="autor · detalle…" style="width:100%">
-        <label class="btn small" style="margin-top:8px">🏷️ Logo / marca de agua<input type="file" accept=".png" onchange="onLogo(this.files[0])"></label>
-        <div class="row2" style="margin-top:6px;gap:8px"><span class="muted">Esquina</span><select id="logoCorner" style="flex:1"><option value="br">Abajo dcha.</option><option value="bl">Abajo izq.</option><option value="tr">Arriba dcha.</option><option value="tl">Arriba izq.</option></select></div>
-        <label class="pl">Tamaño logo</label><div class="sline"><input type="range" id="logoSize" min="6" max="40" value="18" oninput="$('lsV').textContent=this.value+'%'"><span class="sv" id="lsV">18%</span></div>
-        <label class="pl">Opacidad logo</label><div class="sline"><input type="range" id="logoOp" min="20" max="100" value="90" oninput="$('loV').textContent=this.value+'%'"><span class="sv" id="loV">90%</span></div>
-        <div class="muted" style="font-size:11px;margin-top:6px">Se incrusta en la Foto PNG, el GIF y la hoja de contacto (no en el WebM).</div>
-      </div>
-    </div>
-
-    <div class="acc" data-k="export"><div class="acc-h" onclick="toggleAcc(this)"><span class="ico">📤</span>Exportar<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
-      <div class="acc-b">
-        <label class="pl">Formato (relación de aspecto)</label>
-        <select id="aspectSel" onchange="setAspect(this.value)" style="width:100%"><option value="">Libre (rellena el visor)</option><option value="1">Cuadrado 1:1</option><option value="1.7778">Horizontal 16:9</option><option value="0.5625">Vertical 9:16 (móvil)</option><option value="0.8">Retrato 4:5</option><option value="1.5">Foto 3:2</option></select>
-        <label class="pl">Foto PNG (calidad)</label>
-        <div class="qbtns"><button class="btn small" onclick="exportPNG(1)">1×</button><button class="btn small" onclick="exportPNG(2)">2×</button><button class="btn small" onclick="exportPNG(4)">4×</button></div>
-        <label class="pl">Animado (duración)</label>
-        <div class="sline"><input type="range" id="recSecs" min="1" max="20" value="4" oninput="$('rsV').textContent=this.value+'s'"><span class="sv" id="rsV">4s</span></div>
-        <label class="row2" style="font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="recTurn" checked> Giro 360°</label>
-        <label class="pl">Punto de inicio del giro <span class="muted" style="font-weight:400">(qué lado mira al empezar)</span></label>
-        <div class="sline"><input type="range" id="spinStart" min="0" max="360" step="5" value="0" oninput="setSpinStart(this.value); $('ssV').textContent=this.value+'°'"><span class="sv" id="ssV">0°</span></div>
-        <div class="row2" style="margin-top:8px;gap:6px"><button class="btn small primary" id="recBtn" onclick="toggleRecord()" style="flex:1">● WebM</button><button class="btn small" id="gifBtn" onclick="exportGIF(+$('recSecs').value||4,$('recTurn').checked)" style="flex:1">🎞️ GIF</button></div>
-        <label class="pl">Hoja de contacto · ángulos</label>
-        <div id="csAngles" class="qbtns" style="flex-wrap:wrap">
-          <button class="btn small on" data-ang="front" onclick="this.classList.toggle('on')">Frontal</button>
-          <button class="btn small on" data-ang="34" onclick="this.classList.toggle('on')">¾</button>
-          <button class="btn small on" data-ang="side" onclick="this.classList.toggle('on')">Lateral</button>
-          <button class="btn small on" data-ang="back" onclick="this.classList.toggle('on')">Trasera</button>
-          <button class="btn small" data-ang="top" onclick="this.classList.toggle('on')">Cenital</button>
-          <button class="btn small" data-ang="low" onclick="this.classList.toggle('on')">Contrapicado</button>
+      <!-- ===== FONDO ===== -->
+      <section data-tab="fondo" hidden>
+        <div class="grp">
+          <div class="sec-h">Fondos rápidos</div>
+          <div class="bgmodes">
+            <button class="btn small" onclick="bgPreset('sky')">Cielo</button>
+            <button class="btn small" onclick="bgPreset('sunset')">Atardecer</button>
+            <button class="btn small" onclick="bgPreset('night')">Noche</button>
+            <button class="btn small" onclick="bgPreset('white')">Blanco</button>
+            <button class="btn small" onclick="bgPreset('grass')">Hierba</button>
+            <button class="btn small" onclick="setBgMode('transparent')">Sin fondo</button>
+          </div>
         </div>
-        <button class="btn small" onclick="contactSheet()" style="margin-top:8px;width:100%">🗂️ Hoja de contacto</button>
-        <div class="muted" style="margin-top:8px;font-size:11px">WebM = mejor peso/calidad · GIF = compatible en todas partes (más pesado).</div>
-      </div>
+        <div class="acc collapsed" data-k="fondo_adv"><div class="acc-h" onclick="toggleAcc(this)">Personalizar<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+          <div class="acc-b">
+            <div class="bgmodes" id="bgModes">
+              <button class="btn small on" data-bg="color" onclick="setBgMode('color')">Liso</button>
+              <button class="btn small" data-bg="gradient" onclick="setBgMode('gradient')">Degradado</button>
+              <button class="btn small" data-bg="radial" onclick="setBgMode('radial')">Foco central</button>
+              <button class="btn small" data-bg="image" onclick="setBgMode('image')">Mi imagen</button>
+              <button class="btn small" data-bg="transparent" onclick="setBgMode('transparent')">Sin fondo</button>
+            </div>
+            <div id="bgColorBox"><label class="pl">Color</label><div class="swrow"><input type="color" id="bgColA" value="#1b1f27" oninput="applyBg()"></div></div>
+            <div id="bgGradBox" style="display:none"><label class="pl">Degradado (arriba→abajo / centro→borde)</label><div class="swrow"><input type="color" id="bgColTop" value="#3a4a7a" oninput="applyBg()"><input type="color" id="bgColBot" value="#0e1014" oninput="applyBg()"></div></div>
+            <div id="bgImgBox" style="display:none">
+              <label class="btn small" style="width:100%;justify-content:center"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10.5V3.5M5.3 6.2 8 3.5l2.7 2.7"/><path d="M3 11.5v1.2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1.2"/></svg>Subir imagen<input type="file" accept=".png,.jpg,.jpeg,.webp" onchange="onBgImage(this.files[0])"></label>
+              <label class="row2" style="margin-top:8px;font-size:12px;color:var(--dim)"><input type="checkbox" id="bgPano" onchange="applyBg()"> Envolver en 360°</label>
+              <button class="btn small" onclick="bgSaveCurrent()" style="width:100%;justify-content:center;margin-top:8px"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 3.5h7l2 2v7a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5z"/><path d="M5.5 3.5v3h4v-3M5.5 13v-3h5v3"/></svg>Guardar este fondo</button>
+              <label class="pl">Mis fondos</label>
+              <div id="bgLib" class="bglib"></div>
+            </div>
+            <div id="cycColorBox" style="display:none"><label class="pl">Color del suelo y la pared</label><div class="swrow"><input type="color" id="cycColIn" value="#2a2e36" oninput="setCycColor(this.value)"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== MARCA ===== -->
+      <section data-tab="marca" hidden>
+        <div class="grp">
+          <div class="sec-h">Textos</div>
+          <label class="pl">Título</label><input type="text" id="capTitle" placeholder="Nombre del diseño…" style="width:100%">
+          <label class="pl">Subtítulo</label><input type="text" id="capSub" placeholder="autor · detalle…" style="width:100%">
+        </div>
+        <div class="grp">
+          <div class="sec-h">Logo</div>
+          <label class="btn small" style="width:100%;justify-content:center"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.4 2.5H13a.9.9 0 0 1 .9.9v4.6a1 1 0 0 1-.3.7l-5.1 5.1a1 1 0 0 1-1.4 0L2.7 9.3a1 1 0 0 1 0-1.4l5.1-5.1a1 1 0 0 1 .6-.3z"/><circle cx="11" cy="5" r=".9"/></svg>Logo / marca de agua<input type="file" accept=".png" onchange="onLogo(this.files[0])"></label>
+          <div class="field"><span class="lbl">Esquina</span><select id="logoCorner"><option value="br">Abajo dcha.</option><option value="bl">Abajo izq.</option><option value="tr">Arriba dcha.</option><option value="tl">Arriba izq.</option></select></div>
+          <label class="pl">Tamaño del logo</label><div class="sline"><input type="range" id="logoSize" min="6" max="40" value="18" oninput="$('lsV').textContent=this.value+'%'"><span class="sv" id="lsV">18%</span></div>
+          <label class="pl">Transparencia del logo</label><div class="sline"><input type="range" id="logoOp" min="20" max="100" value="90" oninput="$('loV').textContent=this.value+'%'"><span class="sv" id="loV">90%</span></div>
+          <div class="muted" style="font-size:11px;margin-top:8px">Se incrusta en la Foto PNG, el GIF y la hoja de contacto (no en el WebM).</div>
+        </div>
+      </section>
+
+      <!-- ===== SALIDA ===== -->
+      <section data-tab="export" hidden>
+        <div class="grp">
+          <div class="sec-h">Tipo</div>
+          <div class="seg" id="outSeg"><button class="btn small on" data-out="foto" onclick="switchOut('foto')"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.3" y="3.3" width="11.4" height="9.4" rx="1.4"/><circle cx="5.7" cy="6.3" r="1.1"/><path d="M2.7 11 5.8 8l2 1.8 2.3-2.4 2.9 3.2"/></svg>Foto</button><button class="btn small" data-out="video" onclick="switchOut('video')"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.3" y="4" width="11.4" height="8" rx="1.2"/><path d="M2.6 6.3h10.8"/><path d="M5 4 6 6.3M8 4 9 6.3"/></svg>Vídeo</button></div>
+        </div>
+        <div id="outFoto">
+          <div class="grp">
+            <div class="sec-h">Exportar imagen</div>
+            <label class="pl">Formato</label>
+            <div class="seg" id="fmtSeg">
+              <button class="btn small on" data-fmt="png" onclick="pickFmt('png')">PNG</button>
+              <button class="btn small" data-fmt="jpg" onclick="pickFmt('jpg')">JPG</button>
+            </div>
+            <label class="pl">Resolución</label>
+            <div class="seg" id="qualSeg">
+              <button class="btn small" data-q="1" onclick="pickQuality(1)">1×</button>
+              <button class="btn small on" data-q="2" onclick="pickQuality(2)">2×</button>
+              <button class="btn small" data-q="4" onclick="pickQuality(4)">4×</button>
+              <button class="btn small" data-q="8" onclick="pickQuality(8)">8×</button>
+            </div>
+            <div class="outsize" id="outSize">—</div>
+          </div>
+          <div class="grp">
+            <div class="sec-h">Galería de ángulos</div>
+            <button class="btn small" onclick="contactSheet()" style="width:100%;justify-content:center"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.6" y="2.6" width="4.6" height="4.6" rx="1"/><rect x="8.8" y="2.6" width="4.6" height="4.6" rx="1"/><rect x="2.6" y="8.8" width="4.6" height="4.6" rx="1"/><rect x="8.8" y="8.8" width="4.6" height="4.6" rx="1"/></svg>Crear galería de ángulos</button>
+            <div class="acc collapsed" data-k="cs_ang"><div class="acc-h" onclick="toggleAcc(this)">Elegir ángulos<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+              <div class="acc-b">
+                <div id="csAngles" class="qbtns" style="flex-wrap:wrap">
+                  <button class="btn small on" data-ang="front" onclick="this.classList.toggle('on')">Frontal</button>
+                  <button class="btn small on" data-ang="34" onclick="this.classList.toggle('on')">¾</button>
+                  <button class="btn small on" data-ang="side" onclick="this.classList.toggle('on')">Lateral</button>
+                  <button class="btn small" data-ang="back" onclick="this.classList.toggle('on')">Trasera</button>
+                  <button class="btn small" data-ang="top" onclick="this.classList.toggle('on')">Cenital</button>
+                  <button class="btn small" data-ang="low" onclick="this.classList.toggle('on')">Contrapicado</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="outVideo" hidden>
+          <div class="grp">
+            <div class="sec-h">Duración</div>
+            <label class="pl">Duración del vídeo/GIF</label>
+            <div class="sline"><input type="range" id="recSecs" min="1" max="20" value="4" oninput="$('rsV').textContent=this.value+'s'"><span class="sv" id="rsV">4s</span></div>
+            <label class="row2" style="font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="recTurn" checked> Giro 360°</label>
+            <label class="pl">Qué gira</label>
+            <select id="spinMode" style="width:100%"><option value="camera">La cámara (orbita)</option><option value="model">El modelo</option></select>
+          </div>
+          <div class="acc collapsed" data-k="vid_adv"><div class="acc-h" onclick="toggleAcc(this)">Avanzado<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
+            <div class="acc-b">
+              <label class="pl">Eje de giro <span class="muted" style="font-weight:400">(en modo «el modelo»)</span></label>
+              <select id="spinAxis" style="width:100%"><option value="y">De pie ↕ (lo normal)</option><option value="x">Voltereta ⟲</option><option value="z">Rodando de lado ↻</option></select>
+              <label class="pl">Lado por el que empieza</label>
+              <div class="sline"><input type="range" id="spinStart" min="0" max="360" step="5" value="0" oninput="setSpinStart(this.value); $('ssV').textContent=this.value+'°'"><span class="sv" id="ssV">0°</span></div>
+            </div>
+          </div>
+          <div class="grp">
+            <div class="sec-h">Acciones</div>
+            <div class="row2" style="gap:6px"><button class="btn small primary" id="recBtn" onclick="toggleRecord()" style="flex:1;justify-content:center"><svg class="ic" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.3"/><circle cx="8" cy="8" r="2.3" fill="currentColor" stroke="none"/></svg><span id="recLbl">Grabar (WebM)</span></button><button class="btn small" id="gifBtn" onclick="exportGIF(+$('recSecs').value||4,$('recTurn').checked)" style="flex:1;justify-content:center"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="9" rx="1.2"/><path d="M5 3.5v9M11 3.5v9"/><path d="M2.5 6.3h2.5M11 6.3h2.5M2.5 9.7h2.5M11 9.7h2.5"/></svg><span id="gifLbl">GIF</span></button></div>
+            <div class="muted" style="margin-top:8px;font-size:11px">WebM = mejor calidad/peso · GIF = compatible en todas partes.</div>
+          </div>
+        </div>
+      </section>
+
     </div>
+    <div class="ph-foot"><button class="btn primary" id="footShot" onclick="doExport()" style="width:100%;justify-content:center"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7M5.3 6.8 8 9.5l2.7-2.7"/><path d="M3 12.5h10"/></svg>Guardar foto</button></div>
   </aside>
 </div>
 
@@ -228,6 +378,7 @@ let camera=PERSP, orthoSize=40;
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const controls=new THREE.OrbitControls(camera,canvas); controls.enableDamping=true;
+controls.mouseButtons={ LEFT:THREE.MOUSE.ROTATE, MIDDLE:THREE.MOUSE.DOLLY, RIGHT:-1 };   // el botón derecho lo gestionamos nosotros (vuelo estilo Blender), no la órbita/pan
 // iluminación de 3 puntos (key con sombra + fill + back/rim) + ambiente bajo
 const amb=new THREE.AmbientLight(0xffffff,0.22);
 const key=new THREE.DirectionalLight(0xffffff,1.25); key.position.set(40,80,50); key.castShadow=true;
@@ -239,7 +390,7 @@ const stage=new THREE.Group(); scene.add(stage);
 // ===== gizmo de transformación (ejes 3D) — UNO solo para toda la sesión, SIEMPRE en scene (nunca en stage: su plano interno es 100000² y reventaría los Box3 de frameAll/camPreset) =====
 let gizmoDragging=false, gizmoMode='translate', gizmoPrevAuto=false, userGizmoHidden=false;
 const tc=new THREE.TransformControls(camera,canvas); tc.setSize(0.8); tc.setSpace('local'); scene.add(tc);   // local: el eje Y del gizmo coincide con el rotY que usa applyTransform
-function syncControls(){ controls.enabled=!(bodyDragging||gizmoDragging); }   // ÚNICA fuente de controls.enabled
+function syncControls(){ controls.enabled=!(bodyDragging||gizmoDragging||flying); }   // ÚNICA fuente de controls.enabled (vuelo incluido)
 function tcResize(){ if(camera.isOrthographicCamera) tc.setSize(0.8*(40/Math.max(1,orthoSize))); else tc.setSize(0.8); }   // en ortho el mango escala por (top-bottom): compensar
 function setGizmoMode(m){ gizmoMode=m; tc.setMode(m);
   if(m==='rotate'){ tc.showX=false; tc.showZ=false; tc.showY=true; } else { tc.showX=true; tc.showY=true; tc.showZ=true; }   // rotate = solo anillo Y
@@ -257,10 +408,14 @@ tc.addEventListener('objectChange',()=>{ const a=actors[sel]; if(!a||tc.object!=
 const shadowCatcher=new THREE.Mesh(new THREE.PlaneGeometry(3000,3000), new THREE.ShadowMaterial({opacity:0.3, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1})); shadowCatcher.rotation.x=-Math.PI/2; shadowCatcher.receiveShadow=true; scene.add(shadowCatcher);   // polygonOffset: empuja el plano de sombra en profundidad para que NO pelee (z-fighting) con la rejilla/base en perspectiva
 let grid=new THREE.GridHelper(200,40,0x3a3026,0x2f261d); grid.position.y=0.02; scene.add(grid); let gridOn=true;   // un pelín por encima del plano de sombra (evita coplanaridad)
 let shadowsOn=true, autoOrbit=false, autoSpeed=0.01;
+// ===== cámara libre estilo Blender/Blockbench (clic derecho = mirar + WASD volar) =====
+let flying=false, flyYaw=0, flyPitch=0, flySpeed=0.9, flyDist=40, flyMoved=false, flyPtrId=null, flyLastX=0, flyLastY=0;
+const flyKeys=Object.create(null), FLYK={'w':1,'a':1,'s':1,'d':1,'q':1,'e':1,' ':1,'shift':1,'control':1}, _flyEu=new THREE.Euler();
 // ciclorama (suelo + pared trasera del mismo color, look de estudio)
 let cyc=null, cycOn=false, cycColor='#2a2e36';
 function ensureCyc(){ if(cyc) return; cyc=new THREE.Group(); const fl=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600), new THREE.MeshLambertMaterial({color:cycColor})); fl.rotation.x=-Math.PI/2; fl.receiveShadow=true; const wl=new THREE.Mesh(new THREE.PlaneGeometry(1600,1000), new THREE.MeshLambertMaterial({color:cycColor})); wl.position.set(0,500,-360); cyc.add(fl,wl); cyc.userData.fl=fl; cyc.userData.wl=wl; scene.add(cyc); }
-function toggleCyc(on){ cycOn=on; ensureCyc(); cyc.visible=on; $('cycBtn')&&$('cycBtn').classList.toggle('on',on); shadowCatcher.visible=shadowsOn&&!on; const cb=$('cycColorBox'); if(cb) cb.style.display=on?'':'none'; }
+function toggleCyc(on){ cycOn=on; ensureCyc(); cyc.visible=on; $('cycBtn')&&$('cycBtn').classList.toggle('on',on); shadowCatcher.visible=shadowsOn&&!on; const cb=$('cycColorBox'); if(cb) cb.style.display=on?'':'none';
+  if(on){ if(typeof switchTab==='function') switchTab('fondo'); const ac=document.querySelector('.acc[data-k="fondo_adv"]'); if(ac){ ac.classList.remove('collapsed'); try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); st['fondo_adv']=false; localStorage.setItem('cs_photo_acc',JSON.stringify(st)); }catch(e){} } } }   // el color del ciclorama vive en el acordeón Personalizar → abrirlo para que sea alcanzable
 function setCycColor(c){ cycColor=c; if(cyc){ cyc.userData.fl.material.color.set(c); cyc.userData.wl.material.color.set(c); } }
 function toggleShadows(on){ shadowsOn=on; key.castShadow=on; shadowCatcher.visible=on&&!cycOn; renderer.shadowMap.needsUpdate=true; }
 // iluminación de 3 puntos + presets + temperatura
@@ -288,23 +443,47 @@ function setCamType(v){ const aspect=(canvas.clientWidth||1)/(canvas.clientHeigh
   else { if(camera.isPerspectiveCamera) return; PERSP.position.copy(ORTHO.position); PERSP.quaternion.copy(ORTHO.quaternion); camera=PERSP; const fr2=$('fovRange'); if(fr2){ fr2.value=PERSP.fov; const fv=$('fovV'); if(fv) fv.textContent=Math.round(PERSP.fov)+'°'; } }
   controls.object=camera; tc.camera=camera; updateCamAspect(aspect); tcResize(); controls.update(); const fr=$('fovRange'); if(fr) fr.disabled=(v==='ortho'); }
 function setFOV(v){ PERSP.fov=+v; if(camera===PERSP){ PERSP.updateProjectionMatrix(); } }
-function setAutoOrbit(on){ autoOrbit=on; }
+let autoAng=0;
+function setAutoOrbit(on){ autoOrbit=on; if(on){ computeSpinPivot(); autoAng=stage.rotation.y; } else { stage.position.set(0,0,0); stage.rotation.set(0,0,0); } }
 let spinStart=0;   // ángulo (rad) desde el que parte el giro 360 del GIF/WebM
-function setSpinStart(v){ spinStart=(+v)*Math.PI/180; if(!recording&&!autoOrbit) stage.rotation.y=spinStart; }   // preview en vivo del lado inicial cuando no se está grabando
+function spinModeVal(){ const s=$('spinMode'); return s?s.value:'camera'; }
+function spinAxisVal(){ const s=$('spinAxis'); return s?s.value:'y'; }
+function setSpinStart(v){ spinStart=(+v)*Math.PI/180; if(!recording&&!autoOrbit&&spinModeVal()!=='camera'){ computeSpinPivot(); spinModelTo(spinStart); } }   // preview del lado inicial solo en modo "modelo"
+// ===== giro: el modelo rota sobre su PROPIO eje (pivote = centro del modelo) =====
+let spinPivot=null;
+function computeSpinPivot(){ const r=stage.rotation.clone(), p=stage.position.clone(); stage.rotation.set(0,0,0); stage.position.set(0,0,0); stage.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(stage); spinPivot=b.isEmpty()?new THREE.Vector3():b.getCenter(new THREE.Vector3()); stage.rotation.copy(r); stage.position.copy(p); }
+function spinModelTo(ang){ if(!spinPivot) computeSpinPivot(); const ax=spinAxisVal(); stage.rotation.set(0,0,0); stage.rotation[ax]=ang;   // rota el stage alrededor del centro del modelo (no del origen del mundo)
+  const moved=spinPivot.clone().applyEuler(stage.rotation); stage.position.copy(spinPivot).sub(moved); }
+// ===== giro de cámara (orbita alrededor del modelo, este se queda quieto) =====
+let orbitBase=null;
+function beginOrbit(){ const t=controls.target.clone(); const o=camera.position.clone().sub(t); const rxz=Math.hypot(o.x,o.z);   // vista cenital: el plano XZ colapsa → usar distancia 3D real para que el 360° no quede pegado al eje
+  orbitBase={t, r: rxz>1e-3 ? rxz : (camera.position.distanceTo(t)||Math.abs(o.y)||16), h:o.y, az0: rxz>1e-3 ? Math.atan2(o.x,o.z) : 0}; }
+function setOrbit(angle){ if(!orbitBase) beginOrbit(); const b=orbitBase, az=b.az0+angle; camera.position.set(b.t.x+Math.sin(az)*b.r, b.t.y+b.h, b.t.z+Math.cos(az)*b.r); camera.lookAt(b.t); }
+function applyTurnFrame(prog){ const ang=spinStart+prog*Math.PI*2; if(spinModeVal()==='camera') setOrbit(ang); else spinModelTo(ang); }
 function applyTransform(a){ a.group.position.set(a.t.x,a.t.y,a.t.z); a.group.rotation.set(0,a.t.rotY,0); a.group.scale.setScalar(a.t.scale); }
 const DEG=Math.PI/180;
 function applyPose(a){ if(!a.pose||!a.bones) return; const anim=(a.clip&&a.clip.bones)||null; for(const bn in a.pose){ const g=a.bones[bn]; if(!g) continue; const P=a.pose[bn]; const r=g.userData.rest;
   if(anim&&anim[bn]){ g.rotation.x+=P[0]*DEG; g.rotation.y+=P[1]*DEG; g.rotation.z+=P[2]*DEG; }   // el clip ya puso reposo+anim este frame → sumamos pose encima
   else { g.rotation.set(r.rx+P[0]*DEG, r.ry+P[1]*DEG, r.rz+P[2]*DEG); } } }                       // sin animar este frame → absoluta (idempotente, no se acumula)
-let recording=false, turntable=false, recStart=0, recDur=4000, mediaRec=null;
+let recording=false, turntable=false, recStart=0, recDur=4000, mediaRec=null, recCamPos=null, recCamTgt=null;
 function loop(){ requestAnimationFrame(loop); resize3(); const now=performance.now();
   if(tc.object&&tc.object.parent===null) tc.detach();   // blindaje: nunca apuntar a un group fuera del grafo
   for(const a of actors){ if(a.clip&&window.applyAnimClip){ const t=a.animOn?((now-a.animStart)/1000):(a.frameT||0); window.applyAnimClip(a.model,a.clip,t); } applyPose(a);
     if(!(gizmoDragging&&tc.object===a.group)) applyTransform(a); }   // durante el arrastre del gizmo, él manda (no pelear por el frame)
-  if(autoOrbit&&!recording) stage.rotation.y+=autoSpeed;
-  if(recording&&turntable&&recDur>0) stage.rotation.y=spinStart+((now-recStart)/recDur)*Math.PI*2;
+  if(autoOrbit&&!recording){ autoAng+=autoSpeed; spinModelTo(autoAng); }
+  if(flying){ const f=new THREE.Vector3(); camera.getWorldDirection(f); const rt=new THREE.Vector3().crossVectors(f,camera.up).normalize(); const fast=flyKeys['shift']?2.6:1; const mv=new THREE.Vector3();
+    if(flyKeys['d'])mv.add(rt); if(flyKeys['a'])mv.sub(rt); if(flyKeys['e']||flyKeys[' '])mv.y+=1; if(flyKeys['q']||flyKeys['control'])mv.y-=1;   // lados/altura: igual en ambas cámaras
+    if(camera.isOrthographicCamera){   // ortográfica: avanzar no cambia el encuadre → W/S = acercar/alejar (zoom)
+      let fz=0; if(flyKeys['w'])fz-=1; if(flyKeys['s'])fz+=1;
+      if(fz){ orthoSize=Math.max(2,Math.min(400, orthoSize*(1+fz*0.03*fast))); updateCamAspect((canvas.clientWidth||1)/(canvas.clientHeight||1)); tcResize(); }
+    } else { if(flyKeys['w'])mv.add(f); if(flyKeys['s'])mv.sub(f); }   // perspectiva: vuelo libre completo
+    if(mv.lengthSq()){ mv.normalize().multiplyScalar(flySpeed*fast); camera.position.add(mv); } }
+  const camRec = recording && turntable && recDur>0 && spinModeVal()==='camera';   // grabando WebM con cámara orbitando
+  if(recording&&turntable&&recDur>0) applyTurnFrame((now-recStart)/recDur);
   tc.visible = !recording && !busyExport && sel>=0 && !!tc.object && !userGizmoHidden;   // el gizmo NUNCA sale en foto/vídeo, ni sin selección
-  controls.update(); renderer.render(scene,camera); }
+  if(!camRec && !flying) controls.update();   // en modo cámara (órbita grabada) o volando, la cámara la fijamos nosotros
+  renderer.render(scene,camera); }
 
 function frameAll(){ if(!actors.length) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(stage); if(b.isEmpty()) return; const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16; camera.position.set(c.x+r*0.7, c.y+s.y*0.15+r*0.5, c.z+r*1.8); controls.target.copy(c); controls.update(); if(camera.isOrthographicCamera){ camera.zoom=1; orthoSize=r*0.95; updateCamAspect((canvas.clientWidth||1)/(canvas.clientHeight||1)); } tcResize(); }
 
@@ -350,7 +529,7 @@ function removeActor(i){ const a=actors[i]; if(!a)return; if(tc.object===a.group
   if(actors[sel]) tc.attach(actors[sel].group); else { sel=-1; tc.detach(); } renderActorList(); renderActorProps(); }
 function selectActor(i){ sel=i; if(actors[i]){ actors[i].animStart=performance.now(); tc.attach(actors[i].group); } else tc.detach(); renderActorList(); renderActorProps(); }
 function deselect(){ if(sel<0) return; sel=-1; tc.detach(); renderActorList(); renderActorProps(); }   // quita el gizmo y limpia el panel
-function renderActorList(){ updateHud(); const el=$('actorList'); const es=$('emptyState'); if(es) es.style.display=actors.length?'none':'flex'; if(!actors.length){ el.innerHTML='<div class="muted" style="font-size:12px">Aún no hay Pokémon en la escena.</div>'; return; } el.innerHTML='';
+function renderActorList(){ updateHud(); updateExportBar(); const el=$('actorList'); const es=$('emptyState'); if(es) es.style.display=actors.length?'none':'flex'; if(!actors.length){ el.innerHTML='<div class="muted" style="font-size:12px">Aún no hay Pokémon en la escena.</div>'; return; } el.innerHTML='';
   actors.forEach((a,i)=>{ const d=document.createElement('div'); d.className='actor-row'+(i===sel?' on':''); const n=document.createElement('span'); n.className='an'; n.textContent=a.name.replace(/_/g,' '); const x=document.createElement('span'); x.className='ax'; x.textContent='✕'; x.title='Quitar'; x.onclick=e=>{ e.stopPropagation(); removeActor(i); }; d.appendChild(n); d.appendChild(x); d.onclick=()=>selectActor(i); el.appendChild(d); }); }
 function renderActorProps(){ const el=$('actorProps'); if(sel<0||!actors[sel]){ el.innerHTML=''; return; } const a=actors[sel];
   const opts=a.animNames.map(n=>'<option value="'+esc(n)+'"'+(a.clip&&a.clip.name===n?' selected':'')+'>'+esc(n.replace(/^animation\.[^.]+\./,''))+'</option>').join('');
@@ -404,8 +583,9 @@ function syncPropInputs(a){ const set=(id,v)=>{ const el=$(id); if(el) el.value=
   set('acX',Math.round(a.t.x)); set('acZ',Math.round(a.t.z)); set('acY',Math.round(a.t.y));
   set('acScale',Math.round(a.t.scale*100)); set('acRot',Math.round((((a.t.rotY%(2*Math.PI))+2*Math.PI)%(2*Math.PI))*180/Math.PI)); }
 function updateHud(){ const h=$('hud'); if(!h) return;
-  h.textContent = sel<0 ? 'Arrastra para orbitar · rueda = zoom · clic en un Pokémon para seleccionarlo'
-    : ('Gizmo: '+({translate:'Mover',rotate:'Rotar (Y)',scale:'Escalar'}[gizmoMode])+' · W/E/R cambia modo · F encuadra · Esc deselecciona · Supr borra'); }
+  h.textContent = flying ? ('🛩️ Volando · WASD mover · Q/E o Espacio bajar/subir · Shift = rápido · rueda = velocidad ('+flySpeed.toFixed(2)+')')
+    : sel<0 ? 'Arrastra = orbitar · clic derecho + WASD = volar · rueda = zoom · clic en un Pokémon para seleccionarlo'
+    : ('Gizmo: '+({translate:'Mover',rotate:'Rotar (Y)',scale:'Escalar'}[gizmoMode])+' · clic derecho + WASD = volar · F encuadra · Esc deselecciona · Supr borra'); }
 function frameSelected(){ if(sel<0||!actors[sel]) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(actors[sel].group); if(b.isEmpty()) return;
   const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16;
   camera.position.set(c.x+r*0.7, c.y+s.y*0.15+r*0.5, c.z+r*1.8); controls.target.copy(c); controls.update();
@@ -418,7 +598,7 @@ function setFrame(v){ const a=actors[sel]; if(!a||!a.clip)return; a.frameT=+v; a
 // arrastrar un modelo por el suelo (clic + arrastrar)
 const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0); let bodyDragging=false;
 function setNdc(e){ const r=canvas.getBoundingClientRect(); ndc.x=((e.clientX-r.left)/r.width)*2-1; ndc.y=-((e.clientY-r.top)/r.height)*2+1; }
-canvas.addEventListener('pointerdown',e=>{ if(e.button!==0) return;
+canvas.addEventListener('pointerdown',e=>{ if(e.button!==0) return; if(flying) return;
   if(tc.object&&(tc.axis||tc.dragging)||gizmoDragging) return;   // el puntero está sobre/en un mango → lo gestiona el gizmo (no robar el clic ni doble-arrastrar)
   if(!actors.length) return;
   setNdc(e); ray.setFromCamera(ndc,camera); const hits=ray.intersectObjects(actors.map(a=>a.group),true);
@@ -432,6 +612,23 @@ canvas.addEventListener('pointerup',endDrag);
 canvas.addEventListener('pointercancel',endDrag);
 window.addEventListener('pointerup',endDrag);   // si se suelta fuera del lienzo, no dejar la cámara bloqueada
 
+// ===== vuelo libre: clic derecho mantenido = mirar (mouselook) + WASD para moverse =====
+function startFly(e){ flying=true; flyMoved=false; syncControls(); _flyEu.setFromQuaternion(camera.quaternion,'YXZ'); flyYaw=_flyEu.y; flyPitch=_flyEu.x; flyDist=Math.max(8,camera.position.distanceTo(controls.target)); flyLastX=e.clientX; flyLastY=e.clientY; flyPtrId=e.pointerId; try{ canvas.setPointerCapture(e.pointerId); }catch(_){ } updateHud(); }
+function endFly(){ if(!flying) return; flying=false; try{ if(flyPtrId!=null) canvas.releasePointerCapture(flyPtrId); }catch(_){ } flyPtrId=null;
+  const fwd=new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, flyDist);   // dejar el pivote de la órbita delante, donde mira la cámara
+  for(const k in flyKeys) flyKeys[k]=false; syncControls(); controls.update(); updateHud(); }
+canvas.addEventListener('pointerdown',e=>{ if(e.button!==2) return; if(bodyDragging||gizmoDragging||recording||busyExport) return; e.preventDefault(); startFly(e); });   // no volar mientras se graba/exporta (pelearía con la cámara orbitada)
+canvas.addEventListener('pointermove',e=>{ if(!flying) return; const dx=e.clientX-flyLastX, dy=e.clientY-flyLastY; flyLastX=e.clientX; flyLastY=e.clientY; if(dx||dy) flyMoved=true;
+  const s=0.0026; flyYaw-=dx*s; flyPitch-=dy*s; const lim=Math.PI/2-0.02; if(flyPitch>lim)flyPitch=lim; if(flyPitch<-lim)flyPitch=-lim; camera.quaternion.setFromEuler(_flyEu.set(flyPitch,flyYaw,0,'YXZ')); });
+canvas.addEventListener('pointerup',e=>{ if(e.button===2) endFly(); });
+canvas.addEventListener('pointercancel',()=>endFly());
+window.addEventListener('pointerup',e=>{ if(e.button===2) endFly(); });
+window.addEventListener('blur',()=>{ for(const k in flyKeys) flyKeys[k]=false; endFly(); });   // al perder foco: soltar teclas latcheadas (alt-tab con W pulsada) aunque no se esté volando
+canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); e.stopPropagation(); },true);   // clic derecho en el lienzo = volar, nunca menú contextual
+canvas.addEventListener('wheel',e=>{ if(!flying) return; e.preventDefault(); e.stopPropagation(); flySpeed=Math.max(0.15,Math.min(8, flySpeed*(e.deltaY<0?1.15:0.87))); updateHud(); },{passive:false,capture:true});
+window.addEventListener('keydown',e=>{ const t=e.target; if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable)) return; const k=e.key.toLowerCase(); if(FLYK[k]){ flyKeys[k]=true; if(flying) e.preventDefault(); } });
+window.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); if(FLYK[k]) flyKeys[k]=false; });
+
 // ===== rejilla / suelo =====
 function toggleGrid(){ gridOn=!gridOn; $('gridBtn').classList.toggle('on',gridOn); if(gridOn) scene.add(grid); else scene.remove(grid); }
 
@@ -441,20 +638,38 @@ function setBgMode(mode){ bgMode=mode; document.querySelectorAll('#bgModes .btn'
   $('bgColorBox').style.display=mode==='color'?'':'none'; $('bgGradBox').style.display=(mode==='gradient'||mode==='radial')?'':'none'; $('bgImgBox').style.display=mode==='image'?'':'none'; applyBg(); }
 function gradTex(top,bot){ const cv=document.createElement('canvas'); cv.width=8; cv.height=256; const g=cv.getContext('2d'); const grd=g.createLinearGradient(0,0,0,256); grd.addColorStop(0,top); grd.addColorStop(1,bot); g.fillStyle=grd; g.fillRect(0,0,8,256); return new THREE.CanvasTexture(cv); }
 function radialTex(center,edge){ const cv=document.createElement('canvas'); cv.width=cv.height=512; const g=cv.getContext('2d'); const rg=g.createRadialGradient(256,256,20,256,256,360); rg.addColorStop(0,center); rg.addColorStop(1,edge); g.fillStyle=rg; g.fillRect(0,0,512,512); return new THREE.CanvasTexture(cv); }
+function bgTexTune(t){ if(!t) return; t.minFilter=THREE.LinearFilter; t.magFilter=THREE.LinearFilter; t.generateMipmaps=false; try{ t.anisotropy=renderer.capabilities.getMaxAnisotropy(); }catch(e){} t.needsUpdate=true; }   // nitidez: sin mipmaps (no coge un nivel reducido) + anisotropía máxima
+let _genTex=null;   // textura generada (degradado/radial); se libera al regenerar para no fugar VRAM
 function applyBg(){
   if(bgMode==='transparent'){ scene.background=null; renderer.setClearColor(0x000000,0); return; }
   renderer.setClearColor(0x000000,1);
   if(bgMode==='color'){ scene.background=new THREE.Color($('bgColA').value); }
-  else if(bgMode==='gradient'){ scene.background=gradTex($('bgColTop').value,$('bgColBot').value); }
-  else if(bgMode==='radial'){ scene.background=radialTex($('bgColTop').value,$('bgColBot').value); }
+  else if(bgMode==='gradient'||bgMode==='radial'){ if(_genTex){ _genTex.dispose(); _genTex=null; } _genTex=(bgMode==='gradient'?gradTex($('bgColTop').value,$('bgColBot').value):radialTex($('bgColTop').value,$('bgColBot').value)); scene.background=_genTex; }
   else if(bgMode==='image'){ if(bgImgTex){ bgImgTex.mapping=$('bgPano').checked?THREE.EquirectangularReflectionMapping:THREE.UVMapping; scene.background=bgImgTex; } else scene.background=new THREE.Color('#15110d'); }
 }
-function onBgImage(f){ if(!f) return; const url=URL.createObjectURL(f); new THREE.TextureLoader().load(url,t=>{ URL.revokeObjectURL(url); bgImgTex=t; bgMode='image'; setBgMode('image'); },undefined,()=>{ URL.revokeObjectURL(url); toast('No se pudo leer la imagen','err'); }); }
+let lastBgFile=null;
+function onBgImage(f){ if(!f) return; lastBgFile=f; const url=URL.createObjectURL(f); new THREE.TextureLoader().load(url,t=>{ URL.revokeObjectURL(url); bgTexTune(t); if(bgImgTex) bgImgTex.dispose(); bgImgTex=t; bgMode='image'; setBgMode('image'); },undefined,()=>{ URL.revokeObjectURL(url); toast('No se pudo leer la imagen','err'); }); }
+// ===== Mis fondos (persisten en IndexedDB, sin límite práctico de tamaño) =====
+let _bgdb=null;
+function bgDB(){ return new Promise((res,rej)=>{ if(_bgdb) return res(_bgdb); if(!window.indexedDB) return rej(new Error('IndexedDB no disponible')); const r=indexedDB.open('cs-photo',1); r.onupgradeneeded=()=>{ if(!r.result.objectStoreNames.contains('bg')) r.result.createObjectStore('bg',{keyPath:'id'}); }; r.onsuccess=()=>{ _bgdb=r.result; res(_bgdb); }; r.onerror=()=>rej(r.error); r.onblocked=()=>rej(new Error('IndexedDB bloqueado')); }); }
+function bgLibList(){ return bgDB().then(db=>new Promise(res=>{ const tx=db.transaction('bg','readonly').objectStore('bg').getAll(); tx.onsuccess=()=>res(tx.result||[]); tx.onerror=()=>res([]); })).catch(()=>[]); }
+function bgLibPut(rec){ return bgDB().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('bg','readwrite').objectStore('bg').put(rec); tx.onsuccess=res; tx.onerror=()=>rej(tx.error); })); }
+function bgLibDel(id){ return bgDB().then(db=>new Promise(res=>{ const tx=db.transaction('bg','readwrite').objectStore('bg').delete(id); tx.onsuccess=res; tx.onerror=res; })).catch(()=>{}); }
+function makeThumb(file){ return new Promise(res=>{ const u=URL.createObjectURL(file); const img=new Image(); img.onload=()=>{ const s=72,ar=(img.width/img.height)||1.4,c=document.createElement('canvas'); c.width=s; c.height=Math.max(1,Math.round(s/ar)); try{ c.getContext('2d').drawImage(img,0,0,c.width,c.height); }catch(e){} URL.revokeObjectURL(u); res(c.toDataURL('image/jpeg',0.6)); }; img.onerror=()=>{ URL.revokeObjectURL(u); res(''); }; img.src=u; }); }
+async function bgSaveCurrent(){ if(!lastBgFile){ toast('Primero sube una imagen','info'); return; } const thumb=await makeThumb(lastBgFile); const id=Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  try{ await bgLibPut({id, name:lastBgFile.name||'fondo', blob:lastBgFile, thumb}); toast('Fondo guardado en «Mis fondos»','ok'); renderBgLib(); }catch(e){ toast('No se pudo guardar el fondo','err'); } }
+async function renderBgLib(){ const el=$('bgLib'); if(!el) return; const list=await bgLibList();
+  if(!list.length){ el.innerHTML='<div class="muted" style="font-size:11px">Sube una imagen y pulsa «Guardar este fondo» para reusarla.</div>'; return; }
+  list.sort((a,b)=>String(b.id).localeCompare(String(a.id))); el.innerHTML='';
+  for(const r of list){ const d=document.createElement('div'); d.className='bgthumb'; d.title=r.name; if(r.thumb) d.style.backgroundImage='url('+r.thumb+')'; d.onclick=()=>bgLibApply(r.id);
+    const x=document.createElement('span'); x.className='bgx'; x.textContent='✕'; x.title='Quitar'; x.onclick=e=>{ e.stopPropagation(); bgLibDel(r.id).then(renderBgLib); }; d.appendChild(x); el.appendChild(d); } }
+async function bgLibApply(id){ const list=await bgLibList(); const r=list.find(x=>x.id===id); if(!r||!r.blob){ toast('No se encontró el fondo','err'); return; } const url=URL.createObjectURL(r.blob); lastBgFile=r.blob;
+  new THREE.TextureLoader().load(url,t=>{ URL.revokeObjectURL(url); bgTexTune(t); if(bgImgTex) bgImgTex.dispose(); bgImgTex=t; bgMode='image'; setBgMode('image'); },undefined,()=>{ URL.revokeObjectURL(url); toast('No se pudo cargar el fondo','err'); }); }
 
 // ===== presentación: aspecto WYSIWYG, marca/texto, color cine =====
 let aspectRatio=null;
 function setAspect(v){ aspectRatio=v?parseFloat(v):null; layoutCanvas(); }
-function layoutCanvas(){ const host=document.querySelector('.ph-center'); if(!host) return; const W=host.clientWidth,H=host.clientHeight; if(!aspectRatio){ canvas.style.width='100%'; canvas.style.height='100%'; } else { let w=W,h=W/aspectRatio; if(h>H){ h=H; w=H*aspectRatio; } canvas.style.width=Math.round(w)+'px'; canvas.style.height=Math.round(h)+'px'; } }
+function layoutCanvas(){ const host=document.querySelector('.ph-center'); if(!host) return; const W=host.clientWidth,H=host.clientHeight; if(!aspectRatio){ canvas.style.width='100%'; canvas.style.height='100%'; } else { let w=W,h=W/aspectRatio; if(h>H){ h=H; w=H*aspectRatio; } canvas.style.width=Math.round(w)+'px'; canvas.style.height=Math.round(h)+'px'; } if(typeof outSizeReadout==='function') outSizeReadout(); }
 window.addEventListener('resize',layoutCanvas);
 let logoImg=null;
 function onLogo(f){ if(!f) return; const url=URL.createObjectURL(f); const im=new Image(); im.onload=()=>{ URL.revokeObjectURL(url); logoImg=im; toast('Logo cargado','ok'); }; im.onerror=()=>{ URL.revokeObjectURL(url); toast('No se pudo leer el logo','err'); }; im.src=url; }
@@ -482,14 +697,27 @@ function setExposure(v){ renderer.toneMappingExposure=+v; }
 
 // ===== exportar =====
 let busyExport=false;
-async function exportPNG(scale){ if(busyExport||recording) return; busyExport=true; recording=true;   // recording congela resize3 + oculta el gizmo durante los dos render
-  try{ const cw=Math.round(canvas.clientWidth),ch=Math.round(canvas.clientHeight); const w=Math.round(cw*scale),h=Math.round(ch*scale);
+// ===== exportación de imagen (resolución + formato elegidos en la pestaña Salida) =====
+let exportScale=2, exportFmt='png';
+function pickQuality(s){ exportScale=+s; document.querySelectorAll('#qualSeg .btn').forEach(b=>b.classList.toggle('on',+b.dataset.q===exportScale)); outSizeReadout(); }
+function pickFmt(f){ exportFmt=f; document.querySelectorAll('#fmtSeg .btn').forEach(b=>b.classList.toggle('on',b.dataset.fmt===f)); outSizeReadout(); }
+function maxExportScale(){ const PR=renderer.getPixelRatio()||1; const MAX=(renderer.capabilities&&renderer.capabilities.maxTextureSize)||8192; const cw=Math.max(1,Math.round(canvas.clientWidth||1)),ch=Math.max(1,Math.round(canvas.clientHeight||1)); return Math.max(1,Math.floor(Math.min(MAX/(cw*PR),MAX/(ch*PR)))); }   // límite real de textura del equipo
+function outSizeReadout(){ const el=$('outSize'); if(!el) return; const cw=Math.round(canvas.clientWidth||0),ch=Math.round(canvas.clientHeight||0); const cap=maxExportScale(), s=Math.min(exportScale,cap); const w=Math.round(cw*s),h=Math.round(ch*s);
+  if(!w||!h){ el.textContent='—'; return; }
+  const tag=exportFmt==='jpg'?'JPG':('PNG'+(bgMode==='transparent'?' · fondo transparente':'')); el.innerHTML='Saldrá a <b>'+w+' × '+h+'</b> px · '+tag+(s<exportScale?' · <span style="color:var(--warn)">máx del equipo</span>':''); }
+function doExport(){ exportPNG(exportScale, exportFmt); }
+async function exportPNG(scale, fmt){ if(busyExport||recording) return; busyExport=true; recording=true; fmt=fmt||'png';   // recording congela resize3 + oculta el gizmo durante los dos render
+  try{ const cap=maxExportScale(); if(scale>cap){ toast('Resolución reducida a '+cap+'× (límite del equipo)','info'); scale=cap; }   // evitar reventar el canvas/textura → export en negro
+    const cw=Math.round(canvas.clientWidth),ch=Math.round(canvas.clientHeight); const w=Math.round(cw*scale),h=Math.round(ch*scale);
     tc.visible=false; renderer.setSize(w,h,false); updateCamAspect(w/h); renderer.render(scene,camera);
     const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d');
+    if(fmt==='jpg'){ g.fillStyle='#ffffff'; g.fillRect(0,0,w,h); }   // JPG no tiene alfa → fondo blanco bajo lo transparente
     let ok=true; try{ g.drawImage(canvas,0,0,w,h); }catch(e){ ok=false; toast('No se pudo exportar: '+e.message,'err'); }
     const ov=buildOverlay(w,h); if(ov) g.drawImage(ov,0,0);
     renderer.setSize(cw,ch,false); updateCamAspect(cw/ch); renderer.render(scene,camera);
-    if(ok) await saveExport((actors[0]?actors[0].name:'foto')+'.png', cv.toDataURL('image/png').replace(/^data:[^,]+,/,''));
+    const ext=fmt==='jpg'?'jpg':'png', mime=fmt==='jpg'?'image/jpeg':'image/png';
+    let url=null; if(ok){ try{ url=fmt==='jpg'?cv.toDataURL(mime,0.92):cv.toDataURL(mime); }catch(e){ ok=false; toast('No se pudo exportar a esta resolución: '+e.message,'err'); } }
+    if(ok&&url) await saveExport((actors[0]?actors[0].name:'foto')+'.'+ext, url.replace(/^data:[^,]+,/,''));
   } finally{ busyExport=false; recording=false; }
 }
 const ANGLE_LABELS={front:'Frontal','34':'¾',side:'Lateral',back:'Trasera',top:'Cenital',low:'Contrapicado'};
@@ -512,16 +740,29 @@ async function contactSheet(){ if(!actors.length){ toast('Añade al menos un Pok
   finally{ recording=false; busyExport=false; renderer.setPixelRatio(savePR); camera.position.copy(savePos); controls.target.copy(saveTgt); controls.update(); stage.rotation.y=savedRot; renderer.setSize(cw,ch,false); updateCamAspect((cw||1)/(ch||1)); renderer.render(scene,camera); }
 }
 function toggleRecord(){ if(recording){ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); return; }
+  if(!actors.length){ toast('Añade al menos un Pokémon','err'); return; }
   if(!('MediaRecorder' in window)||!canvas.captureStream){ toast('Tu sistema no soporta grabación de vídeo','err'); return; }
-  const secs=Math.max(1,Math.min(20,+$('recSecs').value||4)); turntable=$('recTurn').checked; recDur=secs*1000; recStart=performance.now(); stage.rotation.y=spinStart;
+  const secs=Math.max(1,Math.min(20,+$('recSecs').value||4));
   const stream=canvas.captureStream(30); let opts=[{mimeType:'video/webm;codecs=vp9'},{mimeType:'video/webm;codecs=vp8'},{mimeType:'video/webm'},undefined];
   mediaRec=null; for(const o of opts){ try{ mediaRec=o?new MediaRecorder(stream,o):new MediaRecorder(stream); break; }catch(e){} }
-  if(!mediaRec){ toast('No se pudo iniciar la grabación','err'); return; }
+  if(!mediaRec){ toast('No se pudo iniciar la grabación','err'); return; }   // salir ANTES de tocar estado global (si no, turntable quedaría en true y envenenaría otros renders)
+  turntable=$('recTurn').checked; recDur=secs*1000; recStart=performance.now();
+  recCamPos=camera.position.clone(); recCamTgt=controls.target.clone();   // para restaurar la cámara al acabar
+  if(turntable){ computeSpinPivot(); if(spinModeVal()==='camera'){ controls.target.copy(spinPivot); beginOrbit(); } else spinModelTo(spinStart); } else stage.rotation.y=spinStart;
   const chunks=[]; mediaRec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
-  mediaRec.onstop=()=>{ recording=false; turntable=false; stage.rotation.y=spinStart; try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){} $('recBtn').textContent='● Grabar (WebM)'; $('recBtn').classList.remove('danger');
+  mediaRec.onstop=()=>{ recording=false; turntable=false; orbitBase=null; stage.position.set(0,0,0); stage.rotation.set(0,0,0); if(recCamPos){ camera.position.copy(recCamPos); controls.target.copy(recCamTgt); controls.update(); }   // restaurar cámara y stage tras la órbita
+    try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){} $('recLbl').textContent='Grabar (WebM)'; $('recBtn').classList.remove('danger');
     const blob=new Blob(chunks,{type:'video/webm'}); blobToB64(blob).then(b64=>saveExport((actors[0]?actors[0].name:'foto')+'.webm', b64)); };
-  recording=true; tc.visible=false; renderer.render(scene,camera); mediaRec.start(); $('recBtn').textContent='■ Detener'; $('recBtn').classList.add('danger');   // repintar sin gizmo ANTES de capturar el primer frame
-  setTimeout(()=>{ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); }, recDur+60);
+  recording=true; tc.visible=false; renderer.render(scene,camera);   // repintar sin gizmo ANTES de capturar el primer frame
+  try{
+    mediaRec.start(); $('recLbl').textContent='Detener'; $('recBtn').classList.add('danger');
+    setTimeout(()=>{ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); }, recDur+60);
+  }catch(e){   // si start() falla, revertir TODO el estado (si no, recording/turntable quedan pegados y bloquean la app)
+    recording=false; turntable=false; orbitBase=null; stage.position.set(0,0,0); stage.rotation.set(0,0,0);
+    if(recCamPos){ camera.position.copy(recCamPos); controls.target.copy(recCamTgt); controls.update(); }
+    try{ stream.getTracks().forEach(t=>t.stop()); }catch(_){ } mediaRec=null;
+    $('recLbl').textContent='Grabar (WebM)'; $('recBtn').classList.remove('danger'); toast('No se pudo iniciar la grabación: '+e.message,'err');
+  }
 }
 
 // ===== presets de cámara y fondo =====
@@ -542,24 +783,26 @@ async function exportGIF(seconds, turntable){
   const fps=12, frames=Math.min(72, Math.max(2, Math.round((seconds||4)*fps)));
   const cw=canvas.clientWidth||640, ch=canvas.clientHeight||480, sc=Math.min(1, 420/Math.max(cw,ch));
   const w=Math.max(2,Math.round(cw*sc)), h=Math.max(2,Math.round(ch*sc));
-  const btn=$('gifBtn'); if(btn){ btn.disabled=true; btn.textContent='⏳ GIF…'; }
+  const btn=$('gifBtn'); if(btn){ btn.disabled=true; $('gifLbl').textContent='GIF…'; }
   recording=true; tc.visible=false; const savedRot=stage.rotation.y, savedPR=renderer.getPixelRatio();   // ocultar gizmo antes del primer render síncrono
+  const savePos=camera.position.clone(), saveTgt=controls.target.clone();   // restaurar cámara (modo órbita)
+  if(turntable){ computeSpinPivot(); if(spinModeVal()==='camera'){ controls.target.copy(spinPivot); beginOrbit(); } }
   renderer.setPixelRatio(1); renderer.setSize(w,h,false); updateCamAspect(w/h);
   const cap=document.createElement('canvas'); cap.width=w; cap.height=h; const cx=cap.getContext('2d',{willReadFrequently:true});
   const transparent=(bgMode==='transparent'); const fr=[]; const ov=buildOverlay(w,h);
   try{
     for(let i=0;i<frames;i++){ const t=i/fps;
       for(const a of actors){ if(a.clip&&window.applyAnimClip) window.applyAnimClip(a.model,a.clip, a.animOn? t : (a.frameT||0)); }
-      if(turntable) stage.rotation.y=spinStart+(i/frames)*Math.PI*2;
+      if(turntable) applyTurnFrame(i/frames);
       renderer.render(scene,camera);
       cx.clearRect(0,0,w,h); cx.drawImage(canvas,0,0,w,h); if(ov) cx.drawImage(ov,0,0);
       fr.push(cx.getImageData(0,0,w,h));
-      if((i&3)===0){ if(btn) btn.textContent='⏳ '+Math.round((i+1)/frames*100)+'%'; await new Promise(r=>setTimeout(r,0)); }
+      if((i&3)===0){ const gl=$('gifLbl'); if(gl) gl.textContent=Math.round((i+1)/frames*100)+'%'; await new Promise(r=>setTimeout(r,0)); }
     }
     const bytes=window.encodeGIF(fr,w,h,Math.round(100/fps),{transparent,loop:0});
     const b64=await blobToB64(new Blob([bytes])); await saveExport((actors[0]?actors[0].name:'foto')+'.gif', b64);
   }catch(e){ toast('Error al crear el GIF: '+e.message,'err'); }
-  finally{ stage.rotation.y=savedRot; recording=false; renderer.setPixelRatio(savedPR); renderer.setSize(cw,ch,false); updateCamAspect(cw/ch); renderer.render(scene,camera); if(btn){ btn.disabled=false; btn.textContent='🎞️ GIF'; } }
+  finally{ stage.position.set(0,0,0); stage.rotation.set(0,savedRot,0); camera.position.copy(savePos); controls.target.copy(saveTgt); controls.update(); orbitBase=null; recording=false; renderer.setPixelRatio(savedPR); renderer.setSize(cw,ch,false); updateCamAspect(cw/ch); renderer.render(scene,camera); if(btn){ btn.disabled=false; const gl=$('gifLbl'); if(gl) gl.textContent='GIF'; } }
 }
 
 // ===== picker de modelos (Repositorio + Mi pack) =====
@@ -592,6 +835,7 @@ let _pt=null; function filterPick(){ clearTimeout(_pt); _pt=setTimeout(()=>rende
 window.addEventListener('keydown',e=>{
   const t=e.target; if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable)) return;
   if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(flying) return;   // volando: WASD mueve la cámara, no cambia el modo del gizmo
   if($('pickerOverlay').style.display!=='none'){ if(e.key==='Escape') closePicker(); return; }
   switch(e.key){
     case 'w': case 'W': setGizmoMode('translate'); break;
@@ -612,7 +856,14 @@ if(window.ctxMenu){ ctxMenu.fallback(()=>[ {icon:'🎯',label:'Encuadrar cámara
 // acordeón: plegar/desplegar secciones (recuerda el estado)
 function toggleAcc(h){ const a=h.parentElement; a.classList.toggle('collapsed'); try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); st[a.dataset.k]=a.classList.contains('collapsed'); localStorage.setItem('cs_photo_acc',JSON.stringify(st)); }catch(e){} }
 function restoreAcc(){ try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); document.querySelectorAll('.acc').forEach(a=>{ if(a.dataset.k in st) a.classList.toggle('collapsed',!!st[a.dataset.k]); }); }catch(e){} }
-restoreAcc();
-applyLights(); applyBg(); layoutCanvas(); renderActorList(); loadModels(); setCamType('ortho'); loop();   // cámara ortográfica por defecto
+// ===== pestañas del panel derecho =====
+function switchTab(k){ document.querySelectorAll('#phTabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===k)); document.querySelectorAll('#phTabWrap>section').forEach(s=>s.hidden=(s.dataset.tab!==k)); try{ localStorage.setItem('cs_photo_tab',k); }catch(e){} if(k==='export') outSizeReadout(); }
+function restoreTab(){ let k='cam'; try{ k=localStorage.getItem('cs_photo_tab')||'cam'; }catch(e){} if(!document.querySelector('#phTabWrap>section[data-tab="'+k+'"]')) k='cam'; switchTab(k); }
+function switchOut(m){ document.querySelectorAll('#outSeg .btn').forEach(b=>b.classList.toggle('on',b.dataset.out===m)); $('outFoto').hidden=(m!=='foto'); $('outVideo').hidden=(m!=='video'); }
+function pickCamType(v){ setCamType(v); document.querySelectorAll('#camTypeSeg .btn').forEach(b=>b.classList.toggle('on',b.dataset.val===v)); }
+function pickTemp(v){ setTemp(v); document.querySelectorAll('#tempSeg .btn').forEach(b=>b.classList.toggle('on',b.dataset.val===v)); }
+function updateExportBar(){ const dis=actors.length===0; ['footShot','recBtn','gifBtn'].forEach(id=>{ const b=$(id); if(b){ b.disabled=dis; b.title=dis?'Añade un Pokémon primero':''; } }); }
+restoreAcc(); restoreTab(); switchOut('foto');
+applyLights(); applyBg(); layoutCanvas(); renderActorList(); loadModels(); renderBgLib(); setCamType('ortho'); loop();   // cámara ortográfica por defecto
 </script>
 </body></html>

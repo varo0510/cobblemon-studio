@@ -82,7 +82,7 @@
       const b = bonesSrc[bn];
       bones[bn] = { rotation: compileVec(b.rotation), position: compileVec(b.position), scale: compileVec(b.scale) };
     }
-    return { name, length: a.animation_length || 0, loop: a.loop !== false, bones };
+    return { name, length: a.animation_length || 0, loop: a.loop !== false && a.loop !== 'hold_on_last_frame', bones };
   }
 
   function boneMap(root) {
@@ -103,8 +103,8 @@
       g.rotation.set(rest.rx + (r ? -r[0] * DEG : 0), rest.ry + (r ? -r[1] * DEG : 0), rest.rz + (r ? r[2] * DEG : 0));
       const p = evalVec(ch.position, t);   // unidades, espejo X
       g.position.set(rest.px + (p ? -p[0] : 0), rest.py + (p ? p[1] : 0), rest.pz + (p ? p[2] : 0));
-      const s = evalVec(ch.scale, t);
-      if (s) g.scale.set(s[0] || 1, s[1] || 1, s[2] || 1); else g.scale.set(1, 1, 1);
+      const s = evalVec(ch.scale, t);   // distinguir escala 0 (válida) de canal ausente; finito o 1
+      if (s) g.scale.set(Number.isFinite(s[0]) ? s[0] : 1, Number.isFinite(s[1]) ? s[1] : 1, Number.isFinite(s[2]) ? s[2] : 1); else g.scale.set(1, 1, 1);
     }
   }
 

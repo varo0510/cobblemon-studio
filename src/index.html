@@ -437,6 +437,7 @@
       <a class="snav-item" data-nav="paint" onclick="navPaint()">🖌️ Editor de modelos</a>
       <a class="snav-item" data-nav="paintpng" onclick="navPaintPng()">🖼️ Editor PNG</a>
       <a class="snav-item" data-nav="photo" onclick="navPhoto()">📷 Modo foto</a>
+      <a class="snav-item" data-nav="anim" onclick="navAnim()">🎞️ Modo animar</a>
     </div>
   </div>
 
@@ -2239,6 +2240,7 @@ const FRAME_PAGES={
   paint:  { url:'/paint.html?embed=1',   title:'Editor de modelos', icon:'🖌️', nav:'paint' },
   paintpng:{ url:'/paint.html?embed=1&mode=png', title:'Editor PNG', icon:'🖼️', nav:'paintpng' },
   photo:  { url:'/photo.html?embed=1', title:'Modo foto', icon:'📷', nav:'photo' },
+  anim:   { url:'/anim.html?embed=1', title:'Modo animar', icon:'🎞️', nav:'anim' },
   mypack: { url:'/mypack.html?embed=1', title:'Editar mi pack', icon:'✏️', nav:'editpack' },
   doctor: { url:'/doctor.html?embed=1', title:'Doctor del pack', icon:'🩺', nav:'doctor' },
   export: { url:'/export.html?embed=1', title:'Exportar .zip', icon:'⬇️', nav:'exportar' },
@@ -2248,9 +2250,10 @@ function setFrameMode(on){   // alterna entre el contenido normal (.wrap+.foot) 
   if(w) w.style.display=on?'none':''; if(foot) foot.style.display=on?'none':''; if(fh) fh.classList.toggle('hide',!on);
 }
 function amPackFull(on){ const am=document.querySelector('.appmain'); if(am) am.classList.toggle('packfull', on); }   // "Contenido del pack" a pantalla completa
+const FRAME_V=Date.now();   // cache-buster por sesión: tras recompilar+relanzar, el iframe carga la versión fresca (no cacheada)
 function ensureFrame(key){
   let f=document.querySelector('#frameScreen iframe[data-frame="'+key+'"]');
-  if(!f){ f=document.createElement('iframe'); f.dataset.frame=key; f.src=FRAME_PAGES[key].url; $('frameScreen').appendChild(f); }
+  if(!f){ f=document.createElement('iframe'); f.dataset.frame=key; const u=FRAME_PAGES[key].url; f.src=u+(u.includes('?')?'&':'?')+'_v='+FRAME_V; $('frameScreen').appendChild(f); }
   return f;
 }
 function showFrame(key){
@@ -2268,6 +2271,7 @@ function navReskin(){ openFrameTab('reskin'); }
 function navPaint(){ openFrameTab('paint'); }
 function navPaintPng(){ openFrameTab('paintpng'); }
 function navPhoto(){ openFrameTab('photo'); }
+function navAnim(){ openFrameTab('anim'); }
 function navEditPack(){ openFrameTab('mypack'); }
 function navDoctor(){ openFrameTab('doctor'); }
 // ===== Modo edición: editar un caso del pack (lo llama mypack.html) =====

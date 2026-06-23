@@ -573,8 +573,12 @@ fn fix_loose_numbers(s: &str) -> String {   // GSON acepta .3 (sin el 0); serde 
         if in_str { out.push(c); if esc { esc = false; } else if c == '\\' { esc = true; } else if c == '"' { in_str = false; } continue; }
         if c == '"' { in_str = true; out.push(c); last = '"'; continue; }
         if c == '.' {
-            if i + 1 < ch.len() && ch[i + 1].is_ascii_digit() && !last.is_ascii_digit() { out.push('0'); }
-            out.push('.'); last = '.'; continue;
+            let next_digit = i + 1 < ch.len() && ch[i + 1].is_ascii_digit();
+            let prev_digit = last.is_ascii_digit();
+            if next_digit && !prev_digit { out.push('0'); }   // .3 -> 0.3
+            out.push('.');
+            if prev_digit && !next_digit { out.push('0'); }    // 0. -> 0.0
+            last = '.'; continue;
         }
         out.push(c);
         if !c.is_whitespace() { last = c; }
@@ -973,7 +977,7 @@ fn doctor_safe_path(root: &Path, rel: &str) -> Option<PathBuf> {
 }
 fn doctor_ts() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    format!("{}", SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0))
+    format!("{}", SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0))
 }
 // copia el original a _backup_doctor/<ts>/<rel> antes de tocarlo; devuelve si respaldó (false = el archivo no existía)
 fn doctor_backup(abs: &Path, bdir: &Path, rel: &str) -> Result<bool, String> {
@@ -1058,8 +1062,20 @@ fn doctor_apply_fixes_impl(path: String, fixes: Vec<DoctorFix>) -> Value {
             other => return json!({"ok": false, "error": format!("acción desconocida: {}", other)}),
         }
     }
-    let ts = doctor_ts();
-    let bdir = abs.join("_backup_doctor").join(&ts);
+    // carpeta de backup ÚNICA: create_dir (no create_dir_all) falla con AlreadyExists → nunca pisa un manifest previo
+    let parent = abs.join("_backup_doctor");
+    if let Err(e) = fs::create_dir_all(&parent) { return json!({"ok": false, "error": format!("no se pudo crear backup: {}", e)}); }
+    let base = doctor_ts();
+    let mut n = 0u32;
+    let (ts, bdir) = loop {
+        let cand = if n == 0 { base.clone() } else { format!("{}_{}", base, n) };
+        let dir = parent.join(&cand);
+        match fs::create_dir(&dir) {
+            Ok(_) => break (cand, dir),
+            Err(ref e) if e.kind() == std::io::ErrorKind::AlreadyExists => { n += 1; if n > 9999 { return json!({"ok": false, "error": "no se pudo crear carpeta de backup única"}); } }
+            Err(e) => return json!({"ok": false, "error": format!("no se pudo crear backup: {}", e)}),
+        }
+    };
     let mut manifest: Vec<Value> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
     let mut applied = 0;
@@ -1391,7 +1407,7 @@ fn save_export(app: tauri::AppHandle, name: String, b64: String) -> Result<Optio
             let raw = b64.rsplit(',').next().unwrap_or(&b64).trim();
             let bytes = base64::engine::general_purpose::STANDARD.decode(raw).map_err(|e| e.to_string())?;
             if bytes.is_empty() { return Err("no hay datos que guardar".into()); }
-            fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+            write_atomic(Path::new(&path), &bytes).map_err(|e| e.to_string())?;   // tmp + rename en el mismo dir → no deja un archivo truncado si falla a mitad
             Ok(Some(path))
         }
         None => Ok(None),
