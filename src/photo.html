@@ -206,6 +206,7 @@
             <button class="btn small" data-lp="retrato" onclick="applyLightPreset('retrato')">Retrato</button>
             <button class="btn small" data-lp="cine" onclick="applyLightPreset('cine')">Cine</button>
             <button class="btn small" data-lp="plano" onclick="applyLightPreset('plano')">Plano</button>
+            <button class="btn small" data-lp="envolvente" onclick="applyLightPreset('envolvente')" title="Luz pareja desde todos los ejes (sin lados oscuros ni sombra dura)">Envolvente</button>
           </div>
         </div>
         <div class="grp">
@@ -389,6 +390,9 @@ key.shadow.mapSize.set(2048,2048); key.shadow.camera.left=-200; key.shadow.camer
 const fill=new THREE.DirectionalLight(0xffffff,0.45); fill.position.set(-60,20,-30);
 const back=new THREE.DirectionalLight(0xffe6b0,0.6); back.position.set(0,60,-80);
 scene.add(amb,key,fill,back);
+// rig ENVOLVENTE: 6 luces direccionales desde cada eje (±X,±Y,±Z) → iluminación pareja sin lados oscuros (preset "Envolvente")
+const OMNI_DIRS=[[300,0,0],[-300,0,0],[0,300,0],[0,-300,0],[0,0,300],[0,0,-300]];
+const omni=new THREE.Group(); omni.visible=false; const omniLights=OMNI_DIRS.map(d=>{ const l=new THREE.DirectionalLight(0xffffff,0); l.position.set(d[0],d[1],d[2]); omni.add(l); return l; }); scene.add(omni);
 const stage=new THREE.Group(); scene.add(stage);
 // ===== gizmo de transformación (ejes 3D) — UNO solo para toda la sesión, SIEMPRE en scene (nunca en stage: su plano interno es 100000² y reventaría los Box3 de frameAll/camPreset) =====
 let gizmoDragging=false, gizmoMode='translate', gizmoPrevAuto=false, userGizmoHidden=false;
@@ -420,7 +424,8 @@ function ensureCyc(){ if(cyc) return; cyc=new THREE.Group(); const fl=new THREE.
 function toggleCyc(on){ cycOn=on; ensureCyc(); cyc.visible=on; $('cycBtn')&&$('cycBtn').classList.toggle('on',on); shadowCatcher.visible=shadowsOn&&!on; const cb=$('cycColorBox'); if(cb) cb.style.display=on?'':'none';
   if(on){ if(typeof switchTab==='function') switchTab('fondo'); const ac=document.querySelector('.acc[data-k="fondo_adv"]'); if(ac){ ac.classList.remove('collapsed'); try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); st['fondo_adv']=false; localStorage.setItem('cs_photo_acc',JSON.stringify(st)); }catch(e){} } } }   // el color del ciclorama vive en el acordeón Personalizar → abrirlo para que sea alcanzable
 function setCycColor(c){ cycColor=c; if(cyc){ cyc.userData.fl.material.color.set(c); cyc.userData.wl.material.color.set(c); } }
-function toggleShadows(on){ shadowsOn=on; key.castShadow=on; shadowCatcher.visible=on&&!cycOn; renderer.shadowMap.needsUpdate=true; }
+function toggleShadows(on){ shadowsOn=on; if(lightState.preset==='envolvente') return;   // en Envolvente no hay sombra dura; se guarda el estado para al salir
+  key.castShadow=on; shadowCatcher.visible=on&&!cycOn; renderer.shadowMap.needsUpdate=true; }
 // iluminación de 3 puntos + presets + temperatura
 const TEMPS={ neutra:'#ffffff', calida:'#ffd2a1', fria:'#cfe2ff' };
 const LIGHT_PRESETS={
@@ -430,11 +435,19 @@ const LIGHT_PRESETS={
   plano:{amb:0.5,key:[20,60,60,0.75],fill:[-20,40,-40,0.7],back:[0,0,0,0]},
 };
 const lightState={preset:'studio',mul:1,temp:'neutra'};
-function applyLights(){ const p=LIGHT_PRESETS[lightState.preset]||LIGHT_PRESETS.studio, m=lightState.mul;
+function applyLights(){ const m=lightState.mul, c=TEMPS[lightState.temp]||'#ffffff';
+  if(lightState.preset==='envolvente'){   // luz desde los 6 ejes, plana y sin lados oscuros
+    omni.visible=true; omniLights.forEach(l=>{ l.intensity=0.5*m; l.color.set(c); });
+    amb.intensity=0.16*m; key.intensity=0; fill.intensity=0; back.intensity=0;
+    key.castShadow=false; shadowCatcher.visible=false;   // sin luz clave → sin sombra dura
+    return; }
+  omni.visible=false; omniLights.forEach(l=>l.intensity=0);
+  key.castShadow=shadowsOn; shadowCatcher.visible=shadowsOn&&!cycOn;   // restaurar sombras del modo 3 puntos
+  const p=LIGHT_PRESETS[lightState.preset]||LIGHT_PRESETS.studio;
   amb.intensity=p.amb*m; key.position.set(p.key[0],p.key[1],p.key[2]); key.intensity=p.key[3]*m;
   fill.position.set(p.fill[0],p.fill[1],p.fill[2]); fill.intensity=p.fill[3]*m;
   back.position.set(p.back[0],p.back[1],p.back[2]); back.intensity=p.back[3]*m;
-  const c=TEMPS[lightState.temp]||'#ffffff'; key.color.set(c); fill.color.set(c); }
+  key.color.set(c); fill.color.set(c); }
 function applyLightPreset(name){ lightState.preset=name; document.querySelectorAll('#lightPresets .btn').forEach(b=>b.classList.toggle('on',b.dataset.lp===name)); applyLights(); }
 function setLightMul(v){ lightState.mul=+v; applyLights(); }
 function setTemp(v){ lightState.temp=v; applyLights(); }

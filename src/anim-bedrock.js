@@ -53,9 +53,12 @@
     return null;
   }
 
-  function evalVec(ch, t, len, loop) {
+  function evalVec(ch, tWrap, tCont, len, loop) {
     if (!ch) return null;
-    if (ch.kind === 'vec') return [evalComp(ch.v[0], t), evalComp(ch.v[1], t), evalComp(ch.v[2], t)];
+    // MoLang (sin/cos sobre anim_time): tiempo CONTINUO → el seno fluye y se repite solo, sin corte al "reiniciar".
+    if (ch.kind === 'vec') return [evalComp(ch.v[0], tCont), evalComp(ch.v[1], tCont), evalComp(ch.v[2], tCont)];
+    // Keyframes: tiempo envuelto dentro de [0,len].
+    const t = tWrap;
     const kf = ch.kf; if (!kf.length) return [0, 0, 0];
     const first = kf[0], last = kf[kf.length - 1];
     if (t <= first.t) return first.v.map(c => evalComp(c, t));
@@ -99,16 +102,17 @@
   function applyAnimClip(root, clip, time) {
     if (!root || !clip) return;
     const len = clip.length || 1;
-    const t = clip.loop ? (time % len) : Math.min(time, len);
+    const tWrap = clip.loop ? (time % len) : Math.min(time, len);   // keyframes: ciclar dentro de [0,len]
+    const tCont = clip.loop ? time : Math.min(time, len);           // MoLang: tiempo continuo (sin corte al reiniciar)
     const map = boneMap(root);
     for (const bn in clip.bones) {
       const g = map[bn]; if (!g) continue;
       const ch = clip.bones[bn], rest = g.userData.rest;
-      const r = evalVec(ch.rotation, t, len, clip.loop);   // grados, espejo X,Y
+      const r = evalVec(ch.rotation, tWrap, tCont, len, clip.loop);   // grados, espejo X,Y
       g.rotation.set(rest.rx + (r ? -r[0] * DEG : 0), rest.ry + (r ? -r[1] * DEG : 0), rest.rz + (r ? r[2] * DEG : 0));
-      const p = evalVec(ch.position, t, len, clip.loop);   // unidades, espejo X
+      const p = evalVec(ch.position, tWrap, tCont, len, clip.loop);   // unidades, espejo X
       g.position.set(rest.px + (p ? -p[0] : 0), rest.py + (p ? p[1] : 0), rest.pz + (p ? p[2] : 0));
-      const s = evalVec(ch.scale, t, len, clip.loop);   // distinguir escala 0 (válida) de canal ausente; finito o 1
+      const s = evalVec(ch.scale, tWrap, tCont, len, clip.loop);   // distinguir escala 0 (válida) de canal ausente; finito o 1
       if (s) g.scale.set(Number.isFinite(s[0]) ? s[0] : 1, Number.isFinite(s[1]) ? s[1] : 1, Number.isFinite(s[2]) ? s[2] : 1); else g.scale.set(1, 1, 1);
     }
   }
