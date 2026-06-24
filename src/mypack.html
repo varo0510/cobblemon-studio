@@ -4,6 +4,9 @@
 <link rel="stylesheet" href="/studio.css">
 <script>(function(){ if(new URLSearchParams(location.search).get('embed')==='1') document.documentElement.classList.add('embed'); })();</script>
 <script src="/tauri-shim.js"></script>
+<script src="/vendor/three.min.js"></script>
+<script src="/geo-three-reference.js"></script>
+<script src="/anim-bedrock.js"></script>
 <script src="/ctxmenu.js"></script>
 <style>
   .mp{height:100vh;display:flex;flex-direction:column;background:var(--bg)}
@@ -19,6 +22,13 @@
   .mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
   .mp-card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:9px}
   .mp-card:hover{border-color:var(--line2)}
+  .mp-card.mon{cursor:pointer}
+  .mp-card.mon:hover{border-color:var(--accent)}
+  .mp-thumb{height:118px;border-radius:10px;margin-bottom:8px;background:radial-gradient(circle at 50% 36%, #1b2532, #0c0f14);display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .mp-thumb img{width:100%;height:100%;object-fit:contain}
+  .mp-thumb .ld{width:18px;height:18px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:mpspin .7s linear infinite}
+  .mp-thumb .qm{font-size:30px;opacity:.35}
+  @keyframes mpspin{to{transform:rotate(360deg)}}
   .mp-card .ttl{font-weight:650;font-size:14px;display:flex;align-items:center;gap:8px;text-transform:capitalize}
   .mp-card .ttl .ic{font-size:16px}
   .mp-card .meta{font-size:11.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 10px}
@@ -105,13 +115,13 @@ const TYPES={
   mark:     {label:'Marcas', icon:'🎖️', intuitive:true},
 };
 const ORDER=['pokemon','regional','reskin','cosmetic','spawn','dexEntry','berry','mark'];
-let entities=[], PD=null, RES=[];
+let entities=[], PD=null, RES=[], csReady=false;
 
 async function scan(){
   const body=$('body');
   if(!PROJECT||!PROJECT.root){ body.innerHTML='<div class="mp-empty">No hay ningún pack abierto.<br>Abre o crea un pack desde el Inicio.</div>'; return; }
   body.innerHTML='<div class="mp-load"><span class="spinner"></span>Leyendo tu pack…</div>';
-  entities=[];
+  entities=[]; csReady=false; try{ modelCacheM.clear(); stillCacheM.clear(); }catch(e){}   // reescanear reintenta miniaturas y rehabilita el fallback diferido
   try{
     const det=await csInvoke('pack_detail',{path:PROJECT.root}); PD=det;
     const dp=(det.groups&&det.groups.datapack)||{}, rs=(det.groups&&det.groups.resource)||{};
@@ -177,38 +187,49 @@ function render(){
   let html='';
   for(const type of ORDER){ const items=list.filter(e=>e.type===type); if(!items.length) continue; const T=TYPES[type];
     html+='<div class="mp-group"><div class="mp-gh"><span>'+T.icon+' '+T.label+'</span>'+(T.intuitive?'<span class="badge">edición guiada</span>':'<span class="badge beta">edición por archivos</span>')+'<span class="cnt">'+items.length+'</span></div><div class="mp-grid">';
-    items.forEach((e,i)=>{ const gi=entities.indexOf(e);
-      html+='<div class="mp-card"><div class="ttl"><span class="ic">'+T.icon+'</span>'+esc(e.title)+(e.issues&&e.issues.length?'<span class="warnbadge" title="'+esc(e.issues.map(x=>x.msg).join(' · '))+'">⚠ '+e.issues.length+'</span>':'')+'</div>'+
+    items.forEach((e,i)=>{ const gi=entities.indexOf(e); const sp=speciesOf(e); const isFicha=(e.type==='pokemon'||e.type==='regional'||e.type==='reskin')&&!!sp; const tov=(sp&&e.data&&e.data.texture)?(assetRel(e.data.texture)||''):'';
+      html+='<div class="mp-card'+(sp?' mon':'')+'"'+(sp?' onclick="openEdit('+gi+')"':'')+'>'+
+        (sp?'<div class="mp-thumb" data-sp="'+esc(sp)+'" data-tex="'+esc(tov)+'"><span class="ld"></span></div>':'')+
+        '<div class="ttl"><span class="ic">'+T.icon+'</span>'+esc(e.title)+(e.issues&&e.issues.length?'<span class="warnbadge" title="'+esc(e.issues.map(x=>x.msg).join(' · '))+'">⚠ '+e.issues.length+'</span>':'')+'</div>'+
         (e.sub?'<div class="meta"><span>'+esc(e.sub)+'</span></div>':'')+
         '<div class="files">'+e.files.length+' archivo(s)</div>'+
-        '<div class="acts"><button class="btn small primary" onclick="openEdit('+gi+')">✏️ Editar</button></div></div>';
+        '<div class="acts"><button class="btn small primary" onclick="event.stopPropagation();openEdit('+gi+')">'+(isFicha?'👁️ Ver ficha':'✏️ Editar')+'</button></div></div>';
     });
     html+='</div></div>';
   }
   body.innerHTML=html;
+  fillMiniThumbs();
+  try{ const want=localStorage.getItem('cs_mypack_modal'); if(want){ localStorage.removeItem('cs_mypack_modal'); const parts=String(want).split('|'); const sp=normM(parts[0]), ty=parts[1]; let i=ty?entities.findIndex(e=>normM(speciesOf(e))===sp&&e.type===ty):-1; if(i<0) i=entities.findIndex(e=>normM(speciesOf(e))===sp); if(i>=0 && !$('editOv').classList.contains('open')) openEdit(i,true); } }catch(e){}   // «Editar a fondo» pendiente (frame recién abierto)
+  csReady=true;
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 // ===== panel de edición de un caso (datos + diseño + añadir) =====
-let curEnt=null, panelAssets=[], repTarget=null;
-function assetRel(ref){ if(!ref||ref.indexOf(':')<0) return null; const i=ref.indexOf(':'); return 'assets/'+ref.slice(0,i)+'/'+ref.slice(i+1); }
+let curEnt=null, panelAssets=[], repTarget=null, panelModelRel=null;
+function assetRel(ref){ if(typeof ref!=='string'||ref.indexOf(':')<0) return null; const i=ref.indexOf(':'); return 'assets/'+ref.slice(0,i)+'/'+ref.slice(i+1); }
 function findAssetByName(list,name){ if(!name) return null; const base=String(name).split(/[/:]/).pop().toLowerCase().replace(/\.geo$/,''); let h=list.find(f=>f.rel.split('/').pop().replace(/\.geo\.json$|\.animation\.json$|\.json$/i,'').toLowerCase()===base); if(!h) h=list.find(f=>f.rel.toLowerCase().includes('/'+base+'.')); return h?h.rel:null; }
 function gatherAssets(e){ const tex=new Set(),mdl=new Set(),anm=new Set(); const R=(PD&&PD.groups&&PD.groups.resource)||{}; const models=R.models||[],anims=R.anims||[];
+  const normRel=s=>String(s||'').replace(/\\/g,'/'); const allTex=new Set((R.textures||[]).map(f=>normRel(f.rel)));   // índice de TODAS las texturas del pack (para detectar el sibling shiny)
   const useVar=v=>{ if(v.texture){ const r=assetRel(v.texture); if(r) tex.add(r);} (v.layers||[]).forEach(ly=>{ if(ly&&ly.texture){ const r=assetRel(ly.texture); if(r) tex.add(r);} }); if(v.model){ const r=findAssetByName(models,v.model); if(r) mdl.add(r);} if(v.poser){ const r=findAssetByName(anims,v.poser); if(r) anm.add(r);} };
-  const sp=(e.data.sp||(e.data.species&&(e.data.species.name))||'').toString().toLowerCase();
+  const d=e.data||{}; const sp=(d.sp||(d.species&&d.species.name)||'').toString().toLowerCase();
   if(e.type==='pokemon'){ RES.filter(r=>((r.j.species||'').split(':').pop()||'').toLowerCase()===sp).forEach(r=>(r.j.variations||[]).forEach(useVar)); }
-  else if(e.type==='regional'||e.type==='reskin'){ const asp=e.data.aspect; RES.forEach(r=>{ if(((r.j.species||'').split(':').pop()||'').toLowerCase()!==sp) return; (r.j.variations||[]).forEach(v=>{ if((v.aspects||[]).some(a=>a===asp||a.startsWith(asp+'-'))) useVar(v); }); }); }
+  else if(e.type==='regional'||e.type==='reskin'){ const asp=d.aspect; RES.forEach(r=>{ if(((r.j.species||'').split(':').pop()||'').toLowerCase()!==sp) return; (r.j.variations||[]).forEach(v=>{ if((v.aspects||[]).some(a=>a===asp||a.startsWith(asp+'-'))) useVar(v); }); }); }
   // tambien cualquier archivo de assets ya asociado a la entidad
   (e.files||[]).filter(f=>/\.png$/i.test(f)).forEach(f=>tex.add(f));
+  // si existe la variante shiny (<base>_shiny.png) como archivo aparte, mostrarla también
+  for(const rel of [...tex]){ if(/_shiny\.png$/i.test(rel)) continue; const shiny=normRel(rel).replace(/\.png$/i,'_shiny.png'); if(allTex.has(shiny)) tex.add(shiny); }
   return { textures:[...tex], models:[...mdl], anims:[...anm] }; }
 function speciesOf(e){ const d=e.data||{}; if(d.sp) return d.sp; if(d.species&&d.species.name) return String(d.species.name).toLowerCase(); if(d.spawn&&d.spawn.pokemon) return String(d.spawn.pokemon).split(':').pop(); if(d.entry&&d.entry.speciesId) return String(d.entry.speciesId).split(':').pop(); if(d.cos&&(d.cos.pokemon||[])[0]) return String(d.cos.pokemon[0]).split(':').pop(); return ''; }
-function openEdit(i){ const e=entities[i]; if(!e) return; curEnt=e; const T=TYPES[e.type];
+function openEdit(i, forceModal){ const e=entities[i]; if(!e) return; const _sp=speciesOf(e);
+  if(!forceModal && _sp && (e.type==='pokemon'||e.type==='regional'||e.type==='reskin')){ const p=P(); if(p&&p.csOpenFicha){ p.csOpenFicha(_sp); return; } }   // solo estos tipos → ficha; cosmetic/spawn/dex usan su modal
+  curEnt=e; const T=TYPES[e.type];
   $('edIc').textContent=T.icon; $('edTitle').textContent=e.title;
-  const A=gatherAssets(e); panelAssets=[];
+  const A=gatherAssets(e); panelAssets=[]; panelModelRel=A.models[0]||null;   // modelo del caso (para dibujar islas UV al editar su textura)
   const dataFiles=(e.files||[]).filter(f=>f.startsWith('data/'));
   const fileRow=(rel,label,actions)=>{ const idx=panelAssets.push(rel)-1; const nm=rel.split('/').pop(); return '<div class="ed-row"><span class="nm">'+esc(label||nm)+'<span class="pth">'+esc(rel)+'</span></span>'+actions(idx)+'</div>'; };
   const viewBtn=idx=>'<button class="btn small" onclick="viewAsset('+idx+')">Ver</button>';
   const repBtn=idx=>'<button class="btn small" onclick="startReplace('+idx+')">Reemplazar</button>';
+  const editTexBtn=idx=>'<button class="btn small" onclick="editTexture('+idx+')" title="Editar la textura en el Editor PNG">✏️ Editar</button>';
   const fldBtn=idx=>'<button class="btn small" onclick="fieldsAsset('+idx+')">Campos</button>';
   let html='';
   // 0) avisos del verificador
@@ -219,7 +240,7 @@ function openEdit(i){ const e=entities[i]; if(!e) return; curEnt=e; const T=TYPE
   if(dataFiles.length){ html+='<div class="ed-sec"><h3>Archivos de datos</h3>'+dataFiles.map(rel=>fileRow(rel,null,idx=>fldBtn(idx)+viewBtn(idx))).join('')+'</div>'; }
   // 3) diseño / resource pack
   let dz='';
-  if(A.textures.length) dz+='<div style="margin-bottom:4px;color:var(--dim);font-size:11px">Texturas</div>'+A.textures.map(rel=>fileRow(rel,null,idx=>viewBtn(idx)+repBtn(idx))).join('');
+  if(A.textures.length) dz+='<div style="margin-bottom:4px;color:var(--dim);font-size:11px">Texturas</div>'+A.textures.map(rel=>fileRow(rel,(/_shiny\.png$/i.test(rel)?('✨ '+rel.split('/').pop()):null),idx=>(/\.png$/i.test(rel)?editTexBtn(idx):'')+viewBtn(idx)+repBtn(idx))).join('');
   if(A.models.length) dz+='<div style="margin:6px 0 4px;color:var(--dim);font-size:11px">Modelos (.geo)</div>'+A.models.map(rel=>fileRow(rel,null,idx=>viewBtn(idx)+repBtn(idx))).join('');
   if(A.anims.length) dz+='<div style="margin:6px 0 4px;color:var(--dim);font-size:11px">Animaciones</div>'+A.anims.map(rel=>fileRow(rel,null,idx=>viewBtn(idx)+repBtn(idx))).join('');
   html+='<div class="ed-sec"><h3>Diseño · Resource pack</h3>'+(dz||'<p class="ed-note">No detecté texturas/modelos para este caso.</p>')+'</div>';
@@ -231,13 +252,18 @@ function openEdit(i){ const e=entities[i]; if(!e) return; curEnt=e; const T=TYPE
     '<button class="btn small" onclick="add(\'variante\',\'.g-target\',\''+ns+'\')">🧬 Forma regional</button>'+
     '<button class="btn small" onclick="add(\'aspecto\',\'.k-target\',\''+ns+'\')">🎨 Reskin/aspecto</button>'+
     '<button class="btn small" onclick="add(\'complemento\',\'.wc-target\',\''+ns+'\')">🎩 Cosmético</button>'+
+    '<button class="btn small" onclick="goEvos(\''+esc(sp)+'\')">🔀 Evoluciones</button>'+
+    '<button class="btn small" onclick="goFicha(\''+esc(sp)+'\')">👁️ Ver ficha</button>'+
     '</div></div>'; }
   $('edBody').innerHTML=html; $('editOv').classList.add('open');
 }
 function closeEdit(){ $('editOv').classList.remove('open'); curEnt=null; }
 function guided(){ const e=curEnt; closeEdit(); const p=P(); if(p&&p.csEditEntity) p.csEditEntity(e.type,e); else toast('No disponible','err'); }
 function add(assistId,sel,val){ closeEdit(); const p=P(); if(p&&p.csOpenAssist) p.csOpenAssist(assistId,{[sel]:val}); else toast('No disponible','err'); }
+function goEvos(sp){ closeEdit(); const p=P(); if(p&&p.csOpenEvos) p.csOpenEvos(sp); else toast('No disponible','err'); }
+function goFicha(sp){ closeEdit(); const p=P(); if(p&&p.csOpenFicha) p.csOpenFicha(sp); else toast('No disponible','err'); }
 function viewAsset(idx){ const rel=panelAssets[idx]; if(!rel) return; const p=P(); if(p&&p.csEditFiles) p.csEditFiles([rel]); }
+function editTexture(idx){ const rel=panelAssets[idx]; if(!rel) return; const p=P(); if(p&&p.csEditTexture) p.csEditTexture(rel, panelModelRel); else toast('No disponible','err'); }
 function startReplace(idx){ repTarget=panelAssets[idx]||null; if(!repTarget) return; $('repInput').value=''; $('repInput').click(); }
 function fileB64(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).replace(/^data:[^,]+,/,'')); r.onerror=()=>res(null); r.readAsDataURL(file); }); }
 async function onReplace(input){ const f=input.files&&input.files[0]; if(!f||!repTarget) return; const rel=repTarget; repTarget=null;
@@ -251,7 +277,7 @@ const FLD_LABELS={ name:'Nombre', primaryType:'Tipo 1', secondaryType:'Tipo 2', 
 function fLabel(k){ return FLD_LABELS[k]||k; }
 let fieldRel=null, fieldObj=null;
 function fieldsAsset(idx){ const rel=panelAssets[idx]; if(rel) openFields(rel); }
-async function openFields(rel){ const j=await readJ(rel); if(j==null){ fieldRel=null; fieldObj=null; toast('No pude leer el archivo (¿JSON inválido?)','err'); return; } fieldRel=rel; fieldObj=j; $('fldTitle').textContent='Editar campos · '+rel.split('/').pop(); renderFields(); $('fieldOv').classList.add('open'); }
+async function openFields(rel){ const j=await readJG(rel); if(j==null){ fieldRel=null; fieldObj=null; toast('No pude leer el archivo (¿JSON inválido?)','err'); return; } fieldRel=rel; fieldObj=j; $('fldTitle').textContent='Editar campos · '+rel.split('/').pop(); renderFields(); $('fieldOv').classList.add('open'); }
 function closeFields(){ $('fieldOv').classList.remove('open'); fieldRel=null; fieldObj=null; }
 function isScalar(v){ return v==null||typeof v==='string'||typeof v==='number'||typeof v==='boolean'; }
 function allScalar(o){ return o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).length&&Object.values(o).every(isScalar); }
@@ -275,6 +301,41 @@ async function saveFields(){ if(!fieldObj||!fieldRel) return; const clone=JSON.p
 }
 
 if(window.ctxMenu){ ctxMenu.fallback(()=>[ {icon:'↻',label:'Reescanear',action:scan} ]); }
-scan();
+// ===== mini-ficha: render 3D del modelo a miniatura (pack primero, luego repo) =====
+const normM=x=>String(x||'').toLowerCase().replace(/^[a-z0-9_]+:/,'').trim();
+let NAME2GEO=new Map(), _offM=null; const modelCacheM=new Map(), stillCacheM=new Map();
+async function loadCatalog(){ try{ const r=await fetch('/api/preview/models').then(r=>r.json()); (r&&r.models||[]).forEach(m=>{ const n=normM(m.name); if(m.geo&&!NAME2GEO.has(n)) NAME2GEO.set(n,m.geo); }); }catch(e){} }
+async function readJG(rel){ try{ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel}); return r&&r.text?JSON.parse(r.text):null; }catch(e){ return null; } }
+function loadImgEl(url){ return new Promise(res=>{ if(!url) return res(null); const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src=url; }); }
+function offR(){ if(_offM) return _offM; const cv=document.createElement('canvas'); cv.width=cv.height=192; _offM=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,preserveDrawingBuffer:true}); _offM.setClearColor(0x000000,0); _offM.setPixelRatio(1);
+  cv.addEventListener('webglcontextlost',e=>{ e.preventDefault(); _offM=null; for(const [k,v] of [...stillCacheM]) if(v==null) stillCacheM.delete(k); });   // si se pierde el contexto, permitir reintentar
+  return _offM; }
+function geoForN(sp){ if(NAME2GEO.has(sp)) return NAME2GEO.get(sp); const b=normM(sp).split(/[ _]/)[0]; return NAME2GEO.get(b)||null; }
+async function imgB64(rel){ if(!rel) return null; try{ const im=await csInvoke('read_pack_image',{path:PROJECT.root,rel}); return im&&im.base64?'data:image/png;base64,'+im.base64:null; }catch(e){ return null; } }
+async function packMon(sp){ if(!PD) return null; const R=(PD.groups&&PD.groups.resource)||{}; const models=R.models||[],texs=R.textures||[]; const base=normM(sp).split(/[ _]/)[0];
+  const nm=rel=>normM(rel.split('/').pop().replace(/\.geo\.json$|\.json$|\.png$/i,''));
+  const mf=models.find(f=>nm(f.rel)===normM(sp))||models.find(f=>nm(f.rel)===base); if(!mf) return null;
+  const gr=await readJG(mf.rel); if(!gr||!gr['minecraft:geometry']) return null;
+  let texRel=null; const r=RES.find(r=>{const s=normM((r.j&&r.j.species||'').split(':').pop()); return s===normM(sp)||s===base;}); if(r&&r.j){ const v=(r.j.variations||[]).find(v=>v.texture); if(v&&v.texture) texRel=assetRel(v.texture); }
+  if(!texRel){ const tf=texs.find(f=>nm(f.rel)===normM(sp))||texs.find(f=>nm(f.rel)===base); texRel=tf?tf.rel:null; }
+  const texUrl=await imgB64(texRel); let anim=null; const af=await readJG(mf.rel.replace(/\.geo\.json$/i,'.animation.json')); if(af&&af.animations) anim=af;
+  return {geo:gr,texUrl,anim}; }
+async function repoMon(sp){ const geo=geoForN(sp); if(!geo) return null; try{ const r=await fetch('/api/preview/model?geo='+encodeURIComponent(geo)).then(r=>r.json()); if(!r||r.error||!r.geo) return null; return {geo:r.geo,texUrl:r.texture,anim:(r.animation&&r.animation.animations)?r.animation:null}; }catch(e){ return null; } }
+async function getMon(sp){ if(modelCacheM.has(sp)) return modelCacheM.get(sp); let m=await packMon(sp); if(!m) m=await repoMon(sp); if(m) modelCacheM.set(sp,m); return m||null; }   // no cachear fallos transitorios
+function texFromImgM(img){ if(!img) return null; const t=new THREE.Texture(img); t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestFilter; t.generateMipmaps=false; t.needsUpdate=true; return t; }
+function frameM(obj,cam){ obj.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(obj); if(b.isEmpty()){ cam.position.set(0,0,40); cam.lookAt(0,0,0); return; } const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const fov=cam.fov*Math.PI/180; const half=Math.max(s.x,s.y)/2||8; const d=(half/Math.tan(fov/2))*1.3+s.z/2+2; cam.position.set(c.x,c.y,c.z-d); cam.near=Math.max(.05,d*0.02); cam.far=d*8+s.z*6; cam.lookAt(c.x,c.y,c.z); cam.updateProjectionMatrix(); }
+function stillMon(sp,texRel){ const key=sp+'|'+(texRel||''); if(stillCacheM.has(key)) return stillCacheM.get(key);   // cachea la PROMESA (no re-renderiza ni duplica peticiones en vuelo)
+  const p=(async()=>{ const m=await getMon(sp); if(!m) return null;
+    try{ const url0=texRel?(await imgB64(texRel)):m.texUrl; const img=await loadImgEl(url0); const tex=texFromImgM(img); const grp=window.geoToThreeGroup(m.geo, tex); grp.rotation.set(0,0,0); grp.updateMatrixWorld(true);
+      if(m.anim&&window.buildAnimClip&&window.applyAnimClip){ try{ const names=Object.keys(m.anim.animations||{}); const pick=names.find(n=>/ground_idle/i.test(n))||names.find(n=>/idle/i.test(n))||names[0]; const clip=window.buildAnimClip(m.anim,pick); if(clip) window.applyAnimClip(grp,clip,0.4); }catch(e){} }
+      const sc=new THREE.Scene(); sc.add(new THREE.AmbientLight(0xffffff,0.95)); const dl=new THREE.DirectionalLight(0xffffff,0.85); dl.position.set(40,60,50); sc.add(dl); const dl2=new THREE.DirectionalLight(0xbcd2ff,0.35); dl2.position.set(-40,10,-30); sc.add(dl2); sc.add(grp);
+      const cam=new THREE.PerspectiveCamera(34,1,0.1,5000); frameM(grp,cam); const rr=offR(); rr.setSize(192,192,false); rr.render(sc,cam); const url=rr.domElement.toDataURL('image/png');
+      grp.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(mt=>{ if(mt.map) mt.map.dispose(); mt.dispose&&mt.dispose(); }); } }); if(tex) tex.dispose();   // liberar VRAM
+      return url; }catch(e){ return null; } })();
+  stillCacheM.set(key,p); p.then(u=>{ if(u==null) stillCacheM.delete(key); }); return p; }
+async function fillMiniThumbs(){ const els=[...document.querySelectorAll('.mp-thumb[data-sp]')]; for(const el of els){ const url=await stillMon(el.dataset.sp, el.dataset.tex||''); if(!document.body.contains(el)) continue; el.innerHTML=url?'<img src="'+url+'" alt="">':'<span class="qm">❔</span>'; } }
+// puente: abrir el editor avanzado (modal) de un caso por especie, desde la ficha
+window.csOpenCaseBySpecies=function(sp,type){ sp=normM(sp); let i=-1; if(type) i=entities.findIndex(e=>normM(speciesOf(e))===sp&&e.type===type); if(i<0) i=entities.findIndex(e=>normM(speciesOf(e))===sp); if(i>=0){ try{ localStorage.removeItem('cs_mypack_modal'); }catch(e){} openEdit(i,true); return; } if(csReady){ toast('No encontré ese caso en tu pack','err'); return; } try{ localStorage.setItem('cs_mypack_modal', sp+(type?'|'+type:'')); }catch(e){} };
+(async function(){ await loadCatalog(); await scan(); })();
 </script>
 </body></html>

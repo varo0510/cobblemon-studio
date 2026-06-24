@@ -152,19 +152,24 @@
       <label class="row2" data-tools="fill" title="Contiguo: rellena solo píxeles conectados; sin marcar rellena todos los del mismo color en la capa"><input type="checkbox" id="contig" checked> Contig.</label>
       <span class="row2" data-tools="spray">Dens<input type="range" id="pdens" min="5" max="100" value="35" oninput="$('pdensv').textContent=this.value"><span id="pdensv">35</span></span>
       <span class="row2" data-tools="light dark">Int<input type="range" id="pstr" min="4" max="60" value="22" oninput="$('pstrv').textContent=this.value"><span id="pstrv">22</span></span>
-      <label class="row2" data-tools="rect ellipse"><input type="checkbox" id="shapefill"> Relleno</label>
-      <label class="row2" data-tools="grad"><input type="checkbox" id="dither"> Tramado</label>
+      <label class="row2" data-tools="rect ellipse" title="Relleno: dibuja la figura sólida; sin marcar, solo el contorno"><input type="checkbox" id="shapefill"> Relleno</label>
+      <label class="row2" data-tools="grad" title="Tramado (dithering): mezcla los dos colores con patrón de puntos en vez de degradado liso"><input type="checkbox" id="dither"> Tramado</label>
     </div>
     <span class="tsep"></span>
     <button class="btn small" id="undoBtn" onclick="undo()" title="Deshacer (Ctrl+Z)">↶</button>
     <button class="btn small" id="redoBtn" onclick="redo()" title="Rehacer (Ctrl+Y)">↷</button>
+    <span class="tsep"></span>
+    <button class="btn small" onclick="openAdjust()" title="Ajustar tono/saturación/brillo de la capa (o la selección)">🎨 Ajustar</button>
+    <button class="btn small" onclick="openAdjust(160)" title="Generar variante shiny: abre el ajuste con un giro de tono fuerte para recolorear">✨ Shiny</button>
+    <button class="btn small" onclick="mirrorLayer()" title="Reflejar en horizontal la capa (o la selección)">🔁 Espejo</button>
     <span class="sp" style="flex:1"></span>
     <div class="panels-menu"><button class="btn small" onclick="togglePanelsMenu()" title="Mostrar paneles ocultos / restablecer">🪟 Paneles ▾</button><div class="pm-drop" id="pmdrop"></div></div>
     <button class="btn small" id="changeModelBtn" onclick="showStart()" title="Volver a elegir el modelo">🔄 Modelo</button>
-    <input id="aspect" placeholder="nombre del aspecto" style="width:150px" oninput="updateAspectSlug()"><span id="aspectslug"></span>
-    <button class="btn small" onclick="importPNG()">📥</button>
-    <button class="btn small" onclick="exportPNG()">📤</button>
-    <button class="btn small primary" id="go" onclick="doBuild()">💾 Guardar al pack</button>
+    <input id="aspect" placeholder="nombre del aspecto" style="width:150px" oninput="updateAspectSlug()" title="Nombre del aspecto (reskin) que se generará"><span id="aspectslug" title="Identificador final del aspecto"></span>
+    <button class="btn small" onclick="importPNG()" title="Importar un PNG al lienzo">📥</button>
+    <button class="btn small" onclick="exportPNG()" title="Exportar el lienzo como PNG (Guardar como…)">📤</button>
+    <button class="btn small" id="shinyBtn" style="display:none" onclick="saveShinyToPack()" title="Guardar lo que ves como la variante SHINY de esta textura (crea *_shiny.png, no toca la normal)">✨ Guardar shiny</button>
+    <button class="btn small primary" id="go" onclick="doBuild()" title="Guardar al pack">💾 Guardar al pack</button>
   </div>
   <div class="topdesc" id="tooldesc" aria-live="polite"></div>
 
@@ -189,26 +194,38 @@
     <div class="startlist" id="startlist"><div class="mrow full"><span class="spinner"></span>Cargando…</div></div>
     <div class="startimport">
       <span>o importa tu modelo:</span>
-      <label class="btn small">Modelo .geo.json<input type="file" accept=".json,.geo.json" onchange="impGeo(this.files[0])"></label>
-      <label class="btn small">Textura .png<input type="file" accept=".png" onchange="impTex(this.files[0])"></label>
-      <button class="btn small primary" onclick="openImported()">Abrir</button>
+      <label class="btn small" title="Sube el .geo.json de tu modelo (Blockbench)">Modelo .geo.json<input type="file" accept=".json,.geo.json" onchange="impGeo(this.files[0])"></label>
+      <label class="btn small" title="Sube la textura .png de tu modelo (opcional)">Textura .png<input type="file" accept=".png" onchange="impTex(this.files[0])"></label>
+      <button class="btn small primary" onclick="openImported()" title="Abrir el modelo importado en el editor">Abrir</button>
     </div>
   </div>
   <div class="startcard" id="startPng" style="display:none">
     <h1>🖼️ Editor PNG</h1>
     <p class="sub">Crea un lienzo en blanco o importa un PNG para editarlo (sin modelo 3D).</p>
     <div class="startsizes">
-      <button class="btn" onclick="newCanvas(16)">16×16</button>
-      <button class="btn" onclick="newCanvas(32)">32×32</button>
-      <button class="btn" onclick="newCanvas(64)">64×64</button>
-      <button class="btn" onclick="newCanvas(128)">128×128</button>
+      <button class="btn" onclick="newCanvas(16)" title="Lienzo en blanco de 16×16 px">16×16</button>
+      <button class="btn" onclick="newCanvas(32)" title="Lienzo en blanco de 32×32 px">32×32</button>
+      <button class="btn" onclick="newCanvas(64)" title="Lienzo en blanco de 64×64 px (tamaño típico de Pokémon)">64×64</button>
+      <button class="btn" onclick="newCanvas(128)" title="Lienzo en blanco de 128×128 px">128×128</button>
     </div>
     <div class="startrow">Personalizado:
-      <input type="number" id="cw" value="64" min="1" max="1024"> × <input type="number" id="ch" value="64" min="1" max="1024">
-      <button class="btn small primary" onclick="newCanvasCustom()">Crear lienzo</button>
+      <input type="number" id="cw" value="64" min="1" max="1024" title="Ancho en píxeles"> × <input type="number" id="ch" value="64" min="1" max="1024" title="Alto en píxeles">
+      <button class="btn small primary" onclick="newCanvasCustom()" title="Crear un lienzo en blanco con el tamaño indicado">Crear lienzo</button>
     </div>
     <div class="startdiv">o</div>
-    <label class="btn">📥 Importar un PNG<input type="file" accept=".png" onchange="startImportPng(this.files[0])"></label>
+    <label class="btn" title="Abrir un PNG existente para editarlo">📥 Importar un PNG<input type="file" accept=".png" onchange="startImportPng(this.files[0])"></label>
+  </div>
+</div>
+
+<!-- panel FLOTANTE y arrastrable: ajustar color / generar shiny (no tapa el lienzo, ves el cambio en vivo) -->
+<div id="adjOv" style="display:none;position:fixed;left:90px;top:90px;z-index:80;width:280px;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 16px 50px rgba(0,0,0,.5)">
+  <div id="adjHead" style="cursor:move;display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);user-select:none;font-weight:700" title="Arrastra para mover el panel">🎨 Ajustar color<span style="margin-left:auto;font-size:11px;color:var(--faint);font-weight:400">⠿ mover</span></div>
+  <div style="padding:10px 14px 14px">
+    <label style="display:block;font-size:11px;color:var(--dim);margin:8px 0 3px">Tono <span id="adjHueV" class="muted"></span></label><input type="range" id="adjHue" min="-180" max="180" value="0" oninput="syncAdjLabels();applyAdjustPreview()" style="width:100%" title="Gira el matiz de los colores (clave para una variante shiny)">
+    <label style="display:block;font-size:11px;color:var(--dim);margin:10px 0 3px">Saturación <span id="adjSatV" class="muted"></span></label><input type="range" id="adjSat" min="-100" max="100" value="0" oninput="syncAdjLabels();applyAdjustPreview()" style="width:100%" title="Sube o baja la intensidad del color">
+    <label style="display:block;font-size:11px;color:var(--dim);margin:10px 0 3px">Brillo <span id="adjLitV" class="muted"></span></label><input type="range" id="adjLit" min="-100" max="100" value="0" oninput="syncAdjLabels();applyAdjustPreview()" style="width:100%" title="Aclara u oscurece">
+    <div class="muted" style="font-size:11px;margin:10px 0">Afecta a la capa activa (o a la selección). Para una variante <b>shiny</b>, mueve sobre todo el <b>Tono</b> y guarda con «✨ Guardar shiny».</div>
+    <div class="row2" style="gap:8px;justify-content:flex-end;margin-top:6px"><button class="btn small" onclick="cancelAdjust()" title="Descartar los cambios y cerrar">Cancelar</button><button class="btn small primary" onclick="applyAdjust()" title="Confirmar los cambios en la capa">Aplicar</button></div>
   </div>
 </div>
 
@@ -417,9 +434,10 @@ async function pick(m){ const folder=m.geo.replace(/\/[^/]+$/,'').split('/').pop
 const BLENDS=[['source-over','Normal'],['multiply','Multiplicar'],['screen','Trama'],['overlay','Superponer'],['lighten','Aclarar'],['darken','Oscurecer'],['color-dodge','Sobreexp.'],['difference','Diferencia']];
 function renderLayers(){ const el=$('layers'); el.innerHTML='';
   for(let i=doc.layers.length-1;i>=0;i--){ const L=doc.layers[i]; const d=document.createElement('div'); d.className='layer'+(i===doc.active?' on':''); d.dataset.i=i;
-    d.innerHTML='<span class="vis" title="Ver/ocultar">'+(L.visible?'👁️':'🚫')+'</span><canvas class="lthumb" width="'+doc.w+'" height="'+doc.h+'"></canvas><span class="lname" title="Doble clic = renombrar">'+L.name+'</span><span class="llock" title="Bloquear" aria-label="'+(L.locked?'Capa bloqueada':'Capa desbloqueada')+'">'+(L.locked?'🔒':'🔓')+'</span>';
+    d.innerHTML='<span class="vis" title="Ver/ocultar">'+(L.visible?'👁️':'🚫')+'</span><canvas class="lthumb" width="'+doc.w+'" height="'+doc.h+'"></canvas><span class="lname" title="Doble clic = renombrar">'+L.name+'</span><span class="lemis" title="Capa emisiva: brilla en la oscuridad (se exporta como *_e.png para ETF)" style="cursor:pointer;padding:0 2px;'+(L.emissive?'':'opacity:.3')+'">✨</span><span class="llock" title="Bloquear" aria-label="'+(L.locked?'Capa bloqueada':'Capa desbloqueada')+'">'+(L.locked?'🔒':'🔓')+'</span>';
     const tc=d.querySelector('.lthumb').getContext('2d'); tc.imageSmoothingEnabled=false; tc.drawImage(L.canvas,0,0);
     d.querySelector('.vis').onclick=(e)=>{ e.stopPropagation(); L.visible=!L.visible; recomposite(); renderLayers(); };
+    d.querySelector('.lemis').onclick=(e)=>{ e.stopPropagation(); L.emissive=!L.emissive; toast(L.emissive?'Capa marcada como emisiva (brillará)':'Capa ya no es emisiva','info'); renderLayers(); };
     d.querySelector('.llock').onclick=(e)=>{ e.stopPropagation(); L.locked=!L.locked; renderLayers(); };
     d.querySelector('.lname').ondblclick=(e)=>{ e.stopPropagation(); renameLayer(i); };
     d.onclick=()=>{ doc.active=i; renderLayers(); updateHud3D(); };
@@ -563,7 +581,78 @@ function importPNG(){ $('imp').click(); }
 async function onImportFile(input){ const f=input.files&&input.files[0]; if(!f) return; const url=URL.createObjectURL(f); const img=await loadImg(url); URL.revokeObjectURL(url); if(!img) return;
   if(!doc.layers.length){ doc.w=img.width; doc.h=img.height; comp.width=doc.w; comp.height=doc.h; cctx=comp.getContext('2d'); scratch.width=doc.w; scratch.height=doc.h; sctx=scratch.getContext('2d'); }
   const L=makeLayer(f.name.replace(/\.png$/i,'')); L.ctx.drawImage(img,0,0,doc.w,doc.h); doc.layers.push(L); doc.active=doc.layers.length-1; renderLayers(); recomposite(); if(!geoCur) fitView(); input.value=''; }
-async function exportPNG(){ flush(); const b64=comp.toDataURL('image/png').replace(/^data:[^,]+,/,''); const p=await saveExport((picked?picked.name:'textura')+'.png', b64); if(p) clearDirty(); }
+async function exportPNG(){ if(busyExport) return; busyExport=true; try{ flush(); const b64=comp.toDataURL('image/png').replace(/^data:[^,]+,/,''); const nm=(picked?picked.name:'textura'); const p=await saveExport(nm+'.png', b64); if(p){ clearDirty(); const eu=compositeEmissive(); if(eu){ toast('Guarda ahora el mapa emisivo (*_e.png)','info'); await saveExport(nm+'_e.png', eu.replace(/^data:[^,]+,/,'')); } } } finally { busyExport=false; } }
+
+// ===== editar una textura EXISTENTE del pack (abierta desde «Editar mi pack») =====
+let packTargetRel=null, packModelRel=null, busyExport=false;
+function setGoMode(){ const go=$('go'); if(go){ if(packTargetRel){ go.textContent='💾 Guardar al pack'; go.onclick=saveToPackTexture; go.title='Sobrescribe la textura normal: '+packTargetRel; } else { go.textContent='📤 Exportar PNG'; go.onclick=exportPNG; go.title='Exportar el lienzo como PNG (Guardar como…)'; } }
+  const sb=$('shinyBtn'); if(sb) sb.style.display = packTargetRel ? '' : 'none'; }   // «Guardar shiny» solo tiene sentido editando una textura del pack
+function shinyRelOf(rel){ return /_shiny\.png$/i.test(rel) ? rel : rel.replace(/\.png$/i,'_shiny.png'); }
+async function saveShinyToPack(){ if(!packTargetRel){ toast('Abre una textura del pack para guardar su shiny','err'); return; } if(!PROJECT||!PROJECT.root){ toast('No hay pack abierto','err'); return; }
+  const shinyRel=shinyRelOf(packTargetRel); flush(); const b64=comp.toDataURL('image/png').replace(/^data:[^,]+,/,''); const btn=$('shinyBtn'); if(btn) btn.disabled=true;
+  const files=[{rel:shinyRel, base64:b64}]; const ef=emissiveFile(shinyRel); if(ef) files.push(ef);
+  const r=await apiPost('/api/generate',{ target:{mode:'existing',path:PROJECT.root}, overwrite:true, items:[], rawFiles:files });
+  if(btn) btn.disabled=false;
+  if(r&&r.error){ toast('Error al guardar shiny: '+r.error,'err'); return; }
+  if(!ef){ try{ await csInvoke('delete_file',{path:PROJECT.root, rel:emissiveRelOf(shinyRel)}); }catch(e){} }
+  toast('Shiny guardado: '+shinyRel.split('/').pop()+(ef?' (+ emisivo)':'')+' ✓','ok'); }
+function clearPackTarget(){ packTargetRel=null; packModelRel=null; setGoMode(); }   // al empezar un lienzo nuevo / importar, dejamos de apuntar a la textura del pack
+async function openPackTexture(rel, modelRel){ if(!rel||!PROJECT||!PROJECT.root){ toast('No hay pack abierto','err'); return; } if(!confirmDiscard()) return; try{ localStorage.removeItem('cs_paint_open'); }catch(e){}
+  try{ const im=await csInvoke('read_pack_image',{path:PROJECT.root, rel}); const b64=im&&im.base64; if(!b64){ toast('No pude leer la textura del pack','err'); return; }
+    const img=await loadImg('data:image/png;base64,'+b64); if(!img){ toast('La textura no es un PNG válido','err'); return; }
+    doc.w=img.width; doc.h=img.height; resizeDoc(); const L=makeLayer(rel.split('/').pop().replace(/\.png$/i,'')||'Textura'); L.ctx.drawImage(img,0,0); doc.layers=[L]; doc.active=0; resetDoc();
+    geoCur=null; uvMap=[];   // islas UV: si el caso tiene modelo, cargar su geometría para dibujarlas sobre el lienzo (no pintar a ciegas)
+    if(modelRel){ try{ const mf=await csInvoke('read_pack_file',{path:PROJECT.root, rel:modelRel}); if(mf&&mf.text){ const geo=JSON.parse(mf.text); if(geo&&geo['minecraft:geometry']){ geoCur=geo; uvMap=buildUVMap(geo); const ub=$('uvbtn'); if(ub){ ub.style.display=''; showUV=true; ub.classList.add('on'); } } } }catch(e){} }
+    if(geoCur){ try{ renderModel(); }catch(e){} } else { if(current3d){ scene.remove(current3d); current3d=null; } compTex=null; }   // refrescar el 3D (no dejar el modelo anterior)
+    renderLayers(); fitView(); recomposite(); updateHistButtons(); updateCoord();
+    packTargetRel=rel; packModelRel=modelRel||null; setGoMode(); const hud=$('hud'); if(hud) hud.textContent=rel.split('/').pop()+' · editando del pack'+(uvMap.length?' · islas UV':''); enterEditor(); clearDirty();
+  }catch(e){ toast('No pude abrir la textura: '+e.message,'err'); } }
+async function saveToPackTexture(){ if(!packTargetRel) return; if(!PROJECT||!PROJECT.root){ toast('No hay pack abierto','err'); return; }
+  flush(); const b64=comp.toDataURL('image/png').replace(/^data:[^,]+,/,''); const go=$('go'); if(go) go.disabled=true;
+  const files=[{rel:packTargetRel, base64:b64}]; const ef=emissiveFile(packTargetRel); if(ef) files.push(ef);
+  const r=await apiPost('/api/generate',{ target:{mode:'existing',path:PROJECT.root}, overwrite:true, items:[], rawFiles:files });
+  if(go) go.disabled=false;
+  if(r&&r.error){ toast('Error al guardar: '+r.error,'err'); return; }
+  if(!ef){ try{ await csInvoke('delete_file',{path:PROJECT.root, rel:emissiveRelOf(packTargetRel)}); }catch(e){} }   // sin capa emisiva → borrar un _e.png viejo (evita brillo fantasma en ETF)
+  toast('Textura guardada en el pack'+(ef?' (+ emisivo)':'')+' ✓','ok'); clearDirty(); }
+// ===== capa emisiva: se exporta como <base>_e.png (mapa de brillo para ETF) =====
+function emissiveRelOf(rel){ return /_e\.png$/i.test(rel)?rel:rel.replace(/\.png$/i,'_e.png'); }
+function compositeEmissive(){ if(!doc.layers.some(L=>L.emissive&&L.visible)) return null; const cv=document.createElement('canvas'); cv.width=doc.w; cv.height=doc.h; const g=cv.getContext('2d'); g.imageSmoothingEnabled=false; for(const L of doc.layers){ if(!L.emissive||!L.visible) continue; g.globalAlpha=L.opacity; g.globalCompositeOperation=L.blend||'source-over'; g.drawImage(L.canvas,0,0); } g.globalAlpha=1; return cv.toDataURL('image/png'); }
+function emissiveFile(rel){ const u=compositeEmissive(); return u?{rel:emissiveRelOf(rel), base64:u.replace(/^data:[^,]+,/,'')}:null; }   // {rel,base64} para rawFiles, o null si no hay capas emisivas
+window.csOpenPackTexture=openPackTexture;   // lo llama el panel «Editar mi pack» (index.html) cuando el editor ya está abierto
+
+// ===== herramientas de color: ajustar tono/saturación/brillo + generar shiny + espejo =====
+function rgbToHsl(r,g,b){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h=0,s=0,l=(mx+mn)/2; const dch=mx-mn;
+  if(dch){ s=l>0.5?dch/(2-mx-mn):dch/(mx+mn); if(mx===r) h=((g-b)/dch)%6; else if(mx===g) h=(b-r)/dch+2; else h=(r-g)/dch+4; h/=6; if(h<0)h+=1; } return [h,s,l]; }
+function hslToRgb(h,s,l){ if(s===0){ const v=Math.round(l*255); return [v,v,v]; } const q=l<0.5?l*(1+s):l+s-l*s, p=2*l-q; const f=t=>{ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; }; return [Math.round(f(h+1/3)*255),Math.round(f(h)*255),Math.round(f(h-1/3)*255)]; }
+let adjOrig=null, adjLayer=null;   // ImageData + capa ANCLADA al abrir (no usar activeLayer: el panel no es modal y se puede cambiar de capa)
+function syncAdjLabels(){ const f=(vid,sid,suf)=>{ const v=+($(sid).value||0); const e=$(vid); if(e) e.textContent=(v>0?'+':'')+v+suf; }; f('adjHueV','adjHue','°'); f('adjSatV','adjSat','%'); f('adjLitV','adjLit','%'); }
+function openAdjust(presetHue){ const L=activeLayer(); if(!L){ toast('No hay capa activa','err'); return; }
+  adjLayer=L; adjOrig=L.ctx.getImageData(0,0,doc.w,doc.h); $('adjHue').value=presetHue||0; $('adjSat').value=0; $('adjLit').value=0; syncAdjLabels(); $('adjOv').style.display='block'; applyAdjustPreview(); }
+// arrastrar el panel de ajuste por su cabecera (para ir viendo el lienzo mientras se varía el color)
+(function(){ const head=$('adjHead'), ov=$('adjOv'); if(!head||!ov) return; let d=null;
+  head.addEventListener('pointerdown',e=>{ const r=ov.getBoundingClientRect(); d={dx:e.clientX-r.left, dy:e.clientY-r.top}; head.setPointerCapture(e.pointerId); e.preventDefault(); });
+  head.addEventListener('pointermove',e=>{ if(!d) return; const w=ov.offsetWidth,h=ov.offsetHeight; let x=e.clientX-d.dx, y=e.clientY-d.dy; x=Math.max(0,Math.min(x,innerWidth-w)); y=Math.max(0,Math.min(y,innerHeight-h)); ov.style.left=x+'px'; ov.style.top=y+'px'; });
+  head.addEventListener('pointerup',()=>{ d=null; });
+  head.addEventListener('pointercancel',()=>{ d=null; });
+})();
+function applyAdjustPreview(){ if(!adjOrig) return; const L=adjLayer; if(!L||!doc.layers.includes(L)) return; const h=+$('adjHue').value||0, s=+$('adjSat').value||0, l=+$('adjLit').value||0;
+  const src=adjOrig.data; const out=L.ctx.createImageData(doc.w,doc.h), d=out.data;
+  for(let i=0;i<src.length;i+=4){ const a=src[i+3]; d[i+3]=a; if(!a) continue;
+    let on=true; if(sel){ const p=i/4; on=inSel(p%doc.w,(p/doc.w)|0); }
+    if(!on){ d[i]=src[i]; d[i+1]=src[i+1]; d[i+2]=src[i+2]; continue; }
+    const hsl=rgbToHsl(src[i],src[i+1],src[i+2]); let H=(hsl[0]+h/360)%1; if(H<0)H+=1; const S=clamp(hsl[1]*(1+s/100),0,1), Lr=clamp(hsl[2]+l/100,0,1);
+    const rgb=hslToRgb(H,S,Lr); d[i]=rgb[0]; d[i+1]=rgb[1]; d[i+2]=rgb[2]; }
+  L.ctx.putImageData(out,0,0); recomposite(); }
+function applyAdjust(){ const L=adjLayer; if(!adjOrig||!L||!doc.layers.includes(L)){ adjOrig=null; adjLayer=null; $('adjOv').style.display='none'; return; }
+  try{ history.undo.push({layer:L,img:adjOrig}); if(history.undo.length>HIST_MAX) history.undo.shift(); history.redo=[]; }catch(e){}   // undo restaura el original
+  updateHistButtons(); markDirty(); refreshThumbs(); adjOrig=null; adjLayer=null; $('adjOv').style.display='none'; }
+function cancelAdjust(){ const L=adjLayer; if(adjOrig&&L&&doc.layers.includes(L)){ L.ctx.putImageData(adjOrig,0,0); recomposite(); } adjOrig=null; adjLayer=null; $('adjOv').style.display='none'; }
+function mirrorLayer(){ const L=activeLayer(); if(!L){ toast('No hay capa activa','err'); return; } snapshot();
+  const r=sel?{x:sel.x,y:sel.y,w:sel.w,h:sel.h}:{x:0,y:0,w:doc.w,h:doc.h};
+  const tmp=document.createElement('canvas'); tmp.width=r.w; tmp.height=r.h; const tx=tmp.getContext('2d'); tx.imageSmoothingEnabled=false; tx.drawImage(L.canvas,r.x,r.y,r.w,r.h,0,0,r.w,r.h);
+  L.ctx.save(); L.ctx.imageSmoothingEnabled=false; L.ctx.clearRect(r.x,r.y,r.w,r.h); L.ctx.translate(r.x+r.w,r.y); L.ctx.scale(-1,1); L.ctx.drawImage(tmp,0,0); L.ctx.restore();
+  recomposite(); refreshThumbs(); markDirty(); }
 
 // ===== anti-pérdida: marcar trabajo sin guardar + autoguardado para recuperar tras un cierre/apagón =====
 let dirtyWork=false, _autoT=null, _quotaWarned=false;
@@ -575,9 +664,9 @@ function clearDirty(){ dirtyWork=false; notifyParentDirty(); clearTimeout(_autoT
 function confirmDiscard(){ return !dirtyWork || confirm('Tienes trabajo sin guardar. ¿Descartarlo?'); }
 function scheduleAutosave(){ clearTimeout(_autoT); _autoT=setTimeout(saveRecover,1500); }
 function saveRecover(){ if(!dirtyWork||!doc.layers.length) return; try{ flush();
-  const snap={ v:1, ts:Date.now(), mode:PNG_MODE?'png':'model', picked:picked, aspect:($('aspect')?$('aspect').value:''), w:doc.w, h:doc.h, active:doc.active, geo:PNG_MODE?null:geoCur,
-    layers:doc.layers.map(L=>({name:L.name,visible:L.visible,opacity:L.opacity,blend:L.blend,locked:L.locked,data:L.canvas.toDataURL('image/png')})) };
-  localStorage.setItem(RECOVER_KEY, JSON.stringify(snap));
+  const snap={ v:1, ts:Date.now(), mode:PNG_MODE?'png':'model', picked:picked, aspect:($('aspect')?$('aspect').value:''), w:doc.w, h:doc.h, active:doc.active, geo:PNG_MODE?null:geoCur, packTargetRel:packTargetRel||null, packModelRel:packModelRel||null,
+    layers:doc.layers.map(L=>({name:L.name,visible:L.visible,opacity:L.opacity,blend:L.blend,locked:L.locked,emissive:!!L.emissive,data:L.canvas.toDataURL('image/png')})) };
+  localStorage.setItem(RECOVER_KEY, JSON.stringify(snap)); _quotaWarned=false;
   }catch(e){ if(!_quotaWarned){ _quotaWarned=true; toast('No se pudo autoguardar para recuperación (almacén lleno). Guarda al pack para no perder el trabajo.','err'); } } }
 function clearRecover(){ try{ localStorage.removeItem(RECOVER_KEY); }catch(e){} }
 async function restoreRecover(snap){
@@ -585,11 +674,14 @@ async function restoreRecover(snap){
   if(snap.mode==='model'){ geoCur=(snap.geo&&snap.geo['minecraft:geometry'])?snap.geo:null; uvMap=geoCur?buildUVMap(geoCur):[]; picked=snap.picked||null; }
   else { geoCur=null; uvMap=[]; picked=null; }
   const layers=[]; let failed=0;
-  for(const Ld of (snap.layers||[])){ const L=makeLayer(Ld.name); L.visible=Ld.visible!==false; L.opacity=(Ld.opacity==null?1:Ld.opacity); L.blend=Ld.blend||'source-over'; L.locked=!!Ld.locked; const img=await loadImg(Ld.data); if(img) L.ctx.drawImage(img,0,0); else failed++; layers.push(L); }
+  for(const Ld of (snap.layers||[])){ const L=makeLayer(Ld.name); L.visible=Ld.visible!==false; L.opacity=(Ld.opacity==null?1:Ld.opacity); L.blend=Ld.blend||'source-over'; L.locked=!!Ld.locked; L.emissive=!!Ld.emissive; const img=await loadImg(Ld.data); if(img) L.ctx.drawImage(img,0,0); else failed++; layers.push(L); }
   doc.layers=layers.length?layers:[makeLayer('Base')]; doc.active=Math.min(snap.active||0, doc.layers.length-1);
   history.undo=[]; history.redo=[]; sel=null; moveData=null;
   if($('aspect')&&snap.aspect) $('aspect').value=snap.aspect;
   if(geoCur) renderModel();
+  packTargetRel=snap.packTargetRel||null; packModelRel=snap.packModelRel||null;   // conservar el destino «Guardar al pack» tras recuperar
+  if(packTargetRel){ const hud=$('hud'); if(hud) hud.textContent=packTargetRel.split('/').pop()+' · editando del pack'; }
+  if(typeof setGoMode==='function') setGoMode();
   renderLayers(); fitView(); recomposite(); updateHistButtons(); if(typeof updateAspectSlug==='function') updateAspectSlug();
   enterEditor(); dirtyWork=true; notifyParentDirty();
   if(failed) toast('Recuperado, pero '+failed+' capa(s) no se pudieron leer','info'); else toast('Trabajo recuperado','ok');
@@ -612,16 +704,16 @@ function enterEditor(){ document.body.classList.remove('choosing'); requestAnima
 function resetDoc(){ history.undo=[]; history.redo=[]; sel=null; moveData=null; geoCur=null; uvMap=[]; picked=null; }
 // lienzo en blanco (modo PNG)
 function newDoc(w,h){ doc.w=clamp(w|0,1,1024); doc.h=clamp(h|0,1,1024); resizeDoc(); doc.layers=[makeLayer('Base')]; doc.active=0; resetDoc(); renderLayers(); fitView(); recomposite(); updateHistButtons(); updateCoord(); clearDirty(); }
-function newCanvas(n){ if(!confirmDiscard()) return; newDoc(n,n); enterEditor(); }
-function newCanvasCustom(){ if(!confirmDiscard()) return; newDoc(+$('cw').value||64,+$('ch').value||64); enterEditor(); }
-async function startImportPng(f){ if(!f) return; if(!confirmDiscard()) return; const url=URL.createObjectURL(f); const img=await loadImg(url); URL.revokeObjectURL(url); if(!img){ toast('No se pudo leer el PNG','err'); return; }
+function newCanvas(n){ if(!confirmDiscard()) return; clearPackTarget(); newDoc(n,n); enterEditor(); }
+function newCanvasCustom(){ if(!confirmDiscard()) return; clearPackTarget(); newDoc(+$('cw').value||64,+$('ch').value||64); enterEditor(); }
+async function startImportPng(f){ if(!f) return; if(!confirmDiscard()) return; clearPackTarget(); const url=URL.createObjectURL(f); const img=await loadImg(url); URL.revokeObjectURL(url); if(!img){ toast('No se pudo leer el PNG','err'); return; }
   doc.w=img.width; doc.h=img.height; resizeDoc(); const L=makeLayer(f.name.replace(/\.png$/i,'')||'Imagen'); L.ctx.drawImage(img,0,0); doc.layers=[L]; doc.active=0; resetDoc(); renderLayers(); fitView(); recomposite(); updateHistButtons(); updateCoord(); enterEditor(); clearDirty(); }
 // importar modelo propio (modo modelo)
 let impGeoData=null, impTexUrl=null, impName='modelo';
 function impGeo(f){ if(!f) return; impName=f.name.replace(/\.geo\.json$|\.json$/i,'')||'modelo'; const r=new FileReader(); r.onload=()=>{ try{ impGeoData=JSON.parse(r.result); }catch(e){ toast('El .geo.json no es válido','err'); impGeoData=null; const gb=document.querySelector('#startModel label.btn'); if(gb) gb.classList.remove('loaded'); } }; r.readAsText(f); }
 function impTex(f){ if(!f) return; if(impTexUrl) URL.revokeObjectURL(impTexUrl); impTexUrl=URL.createObjectURL(f); }
 async function openImported(){ if(!impGeoData){ toast('Importa primero un .geo.json','err'); return; }
-  if(!confirmDiscard()) return;
+  if(!confirmDiscard()) return; clearPackTarget();
   const img=impTexUrl?await loadImg(impTexUrl):null; const desc=(impGeoData['minecraft:geometry']&&impGeoData['minecraft:geometry'][0].description)||{};
   doc.w=(img&&img.width)||desc.texture_width||64; doc.h=(img&&img.height)||desc.texture_height||64; resizeDoc();
   const base=makeLayer('Base'); if(img) base.ctx.drawImage(img,0,0,doc.w,doc.h); doc.layers=[base]; doc.active=0;
@@ -636,6 +728,7 @@ function initMode(){
   } else { $('startModel').style.display='block'; loadModels(); }
   checkRecover();   // si hubo un cierre/apagón con trabajo sin guardar, ofrecer recuperarlo
   showStart();
+  if(PNG_MODE){ try{ const raw=localStorage.getItem('cs_paint_open'); if(raw){ localStorage.removeItem('cs_paint_open'); const o=JSON.parse(raw); if(o&&o.rel&&(!o.root||!PROJECT||o.root===PROJECT.root)) openPackTexture(o.rel, o.model); } }catch(e){} }   // abrir directamente la textura pedida desde «Editar mi pack»
 }
 
 // ===== guardar al pack (reskin) =====
@@ -649,7 +742,8 @@ async function doBuild(){ errMsg(''); $('okbox').style.display='none';
   flush(); const b64=comp.toDataURL('image/png').replace(/^data:[^,]+,/,'');
   const texRel='assets/cobblemon/textures/pokemon/'+picked.folder+'/'+sp+'_'+aspect+'.png';
   const btn=$('go'); btn.disabled=true; btn.textContent='⏳…';
-  const r=await apiPost('/api/generate',{ target:{mode:'existing',path:PROJECT.root}, overwrite:true, items:[{kind:'wizreskin',target:'cobblemon:'+sp,aspect,folder:picked.folder,order:1}], rawFiles:[{rel:texRel,base64:b64}] });
+  const rawFiles=[{rel:texRel,base64:b64}]; const ef=emissiveFile(texRel); if(ef) rawFiles.push(ef);
+  const r=await apiPost('/api/generate',{ target:{mode:'existing',path:PROJECT.root}, overwrite:true, items:[{kind:'wizreskin',target:'cobblemon:'+sp,aspect,folder:picked.folder,order:1}], rawFiles });
   btn.disabled=false; btn.textContent='💾 Guardar al pack';
   if(r.error){ toast('Error al guardar: '+r.error,'err'); return errMsg(r.error); }
   const ok=(r.results||[]).filter(x=>x.status==='written'||x.status==='merged').length;

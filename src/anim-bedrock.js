@@ -53,12 +53,17 @@
     return null;
   }
 
-  function evalVec(ch, t) {
+  function evalVec(ch, t, len, loop) {
     if (!ch) return null;
     if (ch.kind === 'vec') return [evalComp(ch.v[0], t), evalComp(ch.v[1], t), evalComp(ch.v[2], t)];
     const kf = ch.kf; if (!kf.length) return [0, 0, 0];
-    if (t <= kf[0].t) return kf[0].v.map(c => evalComp(c, t));
-    if (t >= kf[kf.length - 1].t) return kf[kf.length - 1].v.map(c => evalComp(c, t));
+    const first = kf[0], last = kf[kf.length - 1];
+    if (t <= first.t) return first.v.map(c => evalComp(c, t));
+    if (t >= last.t) {
+      // en loop, interpolar del ÚLTIMO keyframe de vuelta al PRIMERO (en t=len) → bucle sin corte
+      if (loop && len > last.t) { const k = (t - last.t) / ((len - last.t) || 1); return [0, 1, 2].map(j => { const av = evalComp(last.v[j], t), bv = evalComp(first.v[j], t); return av + (bv - av) * k; }); }
+      return last.v.map(c => evalComp(c, t));
+    }
     let i = 0; while (i < kf.length - 1 && kf[i + 1].t < t) i++;
     const a = kf[i], b = kf[i + 1], k = (t - a.t) / ((b.t - a.t) || 1);
     return [0, 1, 2].map(j => { const av = evalComp(a.v[j], t), bv = evalComp(b.v[j], t); return av + (bv - av) * k; });
@@ -99,11 +104,11 @@
     for (const bn in clip.bones) {
       const g = map[bn]; if (!g) continue;
       const ch = clip.bones[bn], rest = g.userData.rest;
-      const r = evalVec(ch.rotation, t);   // grados, espejo X,Y
+      const r = evalVec(ch.rotation, t, len, clip.loop);   // grados, espejo X,Y
       g.rotation.set(rest.rx + (r ? -r[0] * DEG : 0), rest.ry + (r ? -r[1] * DEG : 0), rest.rz + (r ? r[2] * DEG : 0));
-      const p = evalVec(ch.position, t);   // unidades, espejo X
+      const p = evalVec(ch.position, t, len, clip.loop);   // unidades, espejo X
       g.position.set(rest.px + (p ? -p[0] : 0), rest.py + (p ? p[1] : 0), rest.pz + (p ? p[2] : 0));
-      const s = evalVec(ch.scale, t);   // distinguir escala 0 (válida) de canal ausente; finito o 1
+      const s = evalVec(ch.scale, t, len, clip.loop);   // distinguir escala 0 (válida) de canal ausente; finito o 1
       if (s) g.scale.set(Number.isFinite(s[0]) ? s[0] : 1, Number.isFinite(s[1]) ? s[1] : 1, Number.isFinite(s[2]) ? s[2] : 1); else g.scale.set(1, 1, 1);
     }
   }

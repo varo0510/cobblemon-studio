@@ -1,0 +1,227 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cobblemon Studio — Ficha de juego</title>
+<link rel="stylesheet" href="/studio.css">
+<script>(function(){ if(new URLSearchParams(location.search).get('embed')==='1') document.documentElement.classList.add('embed'); })();</script>
+<script src="/tauri-shim.js"></script>
+<script src="/vendor/three.min.js"></script>
+<script src="/geo-three-reference.js"></script>
+<script src="/anim-bedrock.js"></script>
+<script src="/ctxmenu.js"></script>
+<style>
+  .fic{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg)}
+  .fic-top{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .fic-top h1{margin:0;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .fic-search{position:relative;flex:1;min-width:200px;max-width:420px}
+  .fic-search input{width:100%}
+  .fic-pick{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--panel);border:1px solid var(--line2);border-radius:10px;max-height:320px;overflow:auto;box-shadow:0 14px 40px rgba(0,0,0,.5);display:none}
+  .fic-pick.open{display:block}
+  .fic-pick .pk{display:flex;align-items:center;gap:8px;padding:7px 11px;cursor:pointer;text-transform:capitalize;font-size:13px}
+  .fic-pick .pk:hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  .fic-pick .pk .dx{margin-left:auto;color:var(--faint);font-size:11px}
+  .fic-pick .pk .tag{font-size:10px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .fic-wrap{flex:1 1 auto;min-height:0;overflow:auto;padding:22px;display:flex;justify-content:center}
+  .fic-empty{margin:auto;text-align:center;color:var(--dim);max-width:340px;display:flex;flex-direction:column;gap:12px;align-items:center}
+  .fic-empty .big{font-size:46px;opacity:.5}
+  .fic-card{width:100%;max-width:880px;background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;display:grid;grid-template-columns:340px 1fr;align-self:flex-start;box-shadow:0 16px 50px rgba(0,0,0,.35)}
+  @media(max-width:760px){ .fic-card{grid-template-columns:1fr} }
+  .fic-left{position:relative;background:radial-gradient(circle at 50% 38%, #1b2532, #0b0e13);display:flex;flex-direction:column}
+  .fic-stage{position:relative;height:300px}
+  #ficCanvas{width:100%;height:100%;display:block}
+  .fic-shiny{position:absolute;top:10px;right:10px}
+  .fic-idhdr{padding:12px 16px 16px;text-align:center}
+  .fic-idhdr .dex{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .fic-idhdr .nm{font-size:22px;font-weight:800;text-transform:capitalize;margin:2px 0 8px}
+  .fic-types{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+  .ftype{padding:3px 12px;border-radius:20px;font-size:11px;font-weight:800;color:#1a1a1a;text-transform:capitalize;text-shadow:0 1px 0 rgba(255,255,255,.25)}
+  .fic-right{padding:18px 20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+  .fic-sec{display:flex;flex-direction:column;gap:8px}
+  .fic-sec h3{margin:0;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--faint)}
+  .fic-dex{font-size:13px;line-height:1.5;color:var(--dim)}
+  .stat{display:grid;grid-template-columns:84px 34px 1fr;align-items:center;gap:8px;font-size:12px}
+  .stat .sl{color:var(--dim)}
+  .stat .sv{text-align:right;font-variant-numeric:tabular-nums;color:var(--text);font-weight:700}
+  .stat .bar{height:9px;border-radius:6px;background:var(--bg2);overflow:hidden}
+  .stat .bar i{display:block;height:100%;border-radius:6px}
+  .fic-bst{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:2px}
+  .fic-bst b{color:var(--text)}
+  .kv{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--dim)}
+  .kv span b{color:var(--text);font-weight:700}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+  .fic-spawn{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--dim)}
+  .fic-check{display:flex;flex-wrap:wrap;gap:6px}
+  .chk{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-weight:600}
+  .chk:hover{border-color:var(--accent)}
+  .chk.chkok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,var(--line));background:var(--panel2)}
+  .chk.chkno{color:var(--faint)}
+  .chk.chkno::before{content:'✗ '}.chk.chkok::before{content:'✓ '}
+  .chk .act{opacity:.75;margin-left:1px}
+  .fic-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-height:48vh;overflow:auto;margin-top:4px}
+  .fic-chip{text-transform:capitalize;font-size:12px;padding:6px 11px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;color:var(--text)}
+  .fic-chip:hover{border-color:var(--accent);color:var(--accent)}
+  .fic-note{font-size:11px;color:var(--faint)}
+</style></head>
+<body>
+<div class="fic">
+  <div class="fic-top">
+    <h1>👁️ Ficha de juego</h1>
+    <div class="fic-search">
+      <input type="text" id="ficSearch" placeholder="🔍 Elige un Pokémon…" oninput="onSearch()" onfocus="onSearch()" autocomplete="off">
+      <div class="fic-pick" id="ficPick"></div>
+    </div>
+    <button class="btn small" onclick="reload()" title="Volver a leer el pack">↺ Recargar</button>
+  </div>
+  <div class="fic-wrap" id="wrap">
+    <div class="fic-empty"><div class="big">👁️</div><div>Busca un Pokémon arriba para ver su <b>ficha</b>: modelo, tipos, estadísticas, Pokédex, aparición y qué le falta.</div></div>
+  </div>
+</div>
+<div id="toaster" class="toaster"></div>
+<script>
+const $=id=>document.getElementById(id);
+const PROJECT=(()=>{ try{ return JSON.parse(localStorage.getItem('cs_current')||'null'); }catch(e){ return null; } })();
+async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+function toast(msg,type){ const host=$('toaster'); if(!host) return; const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg; host.appendChild(t); const close=()=>{ if(!t.parentNode)return; t.classList.add('out'); setTimeout(()=>t.parentNode&&t.parentNode.removeChild(t),300); }; const tm=setTimeout(close,3200); t.onclick=()=>{ clearTimeout(tm); close(); }; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function loadImg(url){ return new Promise(res=>{ if(!url) return res(null); const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src=url; }); }
+const norm=x=>String(x||'').toLowerCase().replace(/^[a-z0-9_]+:/,'').trim();
+const cap=s=>String(s||'').replace(/[_-]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+const TYPE_ES={normal:'Normal',fire:'Fuego',water:'Agua',electric:'Eléctrico',grass:'Planta',ice:'Hielo',fighting:'Lucha',poison:'Veneno',ground:'Tierra',flying:'Volador',psychic:'Psíquico',bug:'Bicho',rock:'Roca',ghost:'Fantasma',dragon:'Dragón',dark:'Siniestro',steel:'Acero',fairy:'Hada'};
+const TYPE_COL={normal:'#A8A77A',fire:'#EE8130',water:'#6390F0',electric:'#F7D02C',grass:'#7AC74C',ice:'#96D9D6',fighting:'#C22E28',poison:'#A33EA1',ground:'#E2BF65',flying:'#A98FF3',psychic:'#F95587',bug:'#A6B91A',rock:'#B6A136',ghost:'#735797',dragon:'#6F35FC',dark:'#705746',steel:'#B7B7CE',fairy:'#D685AD'};
+const STAT_ROWS=[['hp','PS'],['attack','Ataque'],['defence','Defensa'],['special_attack','At. Esp.'],['special_defence','Def. Esp.'],['speed','Velocidad']];
+function assetRel(ref){ if(!ref||ref.indexOf(':')<0) return null; const i=ref.indexOf(':'); return 'assets/'+ref.slice(0,i)+'/'+ref.slice(i+1); }
+function P(){ try{ return (window.parent&&window.parent!==window)?window.parent:null; }catch(e){ return null; } }
+function callParent(fn,a,b){ const p=P(); if(p&&typeof p[fn]==='function'){ try{ p[fn](a,b); return true; }catch(e){} } toast('No disponible','err'); return false; }
+
+// ===== catálogo (nombre→geo / dex) =====
+let CAT=[], NAME2GEO=new Map(), DEX=new Map();
+async function loadCatalog(){ try{ const r=await fetch('/api/preview/models').then(r=>r.json()); CAT=(r&&r.models)||[]; NAME2GEO.clear(); DEX.clear(); for(const m of CAT){ const n=norm(m.name); if(m.geo&&!NAME2GEO.has(n)) NAME2GEO.set(n,m.geo); if(m.dex!=null) DEX.set(n,m.dex); } }catch(e){ CAT=[]; } }
+
+// ===== datos del pack =====
+let PD=null, SPECIES=new Map(), DEXE=new Map(), SPAWNS=new Map(), RES=[], PACKSET=new Set(), SPNS=new Map();
+function nsDe(sp){ return SPNS.get(norm(sp))||'cobblemon'; }   // namespace real de la especie (no forzar cobblemon)
+async function readJ(rel){ try{ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel}); return r&&r.text?JSON.parse(r.text):null; }catch(e){ return null; } }
+async function scanPack(){ SPECIES.clear();DEXE.clear();SPAWNS.clear();RES=[];PACKSET=new Set();SPNS=new Map(); if(!PROJECT||!PROJECT.root){ PD=null; return; }
+  PD=await csInvoke('pack_detail',{path:PROJECT.root}); const dp=(PD.groups&&PD.groups.datapack)||{}, rs=(PD.groups&&PD.groups.resource)||{};
+  const seen=sp=>{ if(sp) PACKSET.add(sp); }; const ns=(sp,n)=>{ if(sp&&n&&!SPNS.has(sp)) SPNS.set(sp,n); };
+  for(const f of (dp.species||[])){ const j=await readJ(f.rel); if(j){ const sp=norm(j.name||f.name.replace(/\.json$/,'')); SPECIES.set(sp,{j,rel:f.rel}); seen(sp); ns(sp,(f.rel.match(/^data\/([^/]+)\//)||[])[1]); } }
+  for(const f of (dp.dexentries||[])){ const j=await readJ(f.rel); if(j){ const sp=norm((j.speciesId||'').split(':').pop()||f.name.replace(/\.json$/,'')); if(sp&&!DEXE.has(sp)) DEXE.set(sp,j); seen(sp); ns(sp,(j.speciesId||'').split(':')[0]); } }
+  for(const f of (dp.spawns||[])){ const j=await readJ(f.rel); if(j&&Array.isArray(j.spawns)){ j.spawns.forEach(s=>{ const ref=String(s.pokemon||'').split(/\s+/)[0]; const sp=norm(ref.split(':').pop()); if(sp){ const a=SPAWNS.get(sp)||[]; a.push(s); SPAWNS.set(sp,a); seen(sp); ns(sp,ref.includes(':')?ref.split(':')[0]:null); } }); } }
+  for(const f of (dp.additions||[])){ const j=await readJ(f.rel); if(j){ const t=(j.target||''); const sp=norm(t.split(':').pop()); seen(sp); ns(sp,t.includes(':')?t.split(':')[0]:null); } }
+  for(const f of (dp.cosmetic||[])){ const j=await readJ(f.rel); if(j){ (j.pokemon||[]).forEach(p=>{ const sp=norm(String(p).split(':').pop()); seen(sp); ns(sp,String(p).includes(':')?String(p).split(':')[0]:null); }); } }
+  for(const f of (dp.assignments||[])){ const j=await readJ(f.rel); if(j){ const arr=Array.isArray(j.pokemon)?j.pokemon:(j.pokemon?[j.pokemon]:[]); arr.forEach(p=>seen(norm(String(p).split(/\s+/)[0].split(':').pop()))); } }
+  for(const f of (rs.resolvers||[])){ const j=await readJ(f.rel); if(j){ RES.push(j); const sp=norm((j.species||'').split(':').pop()); seen(sp); ns(sp,(j.species||'').includes(':')?(j.species||'').split(':')[0]:null); } }
+}
+
+// ===== modelo 3D (pack primero, luego catálogo repo) =====
+const modelCache=new Map();
+function geoForName(name){ if(NAME2GEO.has(name)) return NAME2GEO.get(name); const base=norm(name).split(/[ _]/)[0]; return NAME2GEO.get(base)||null; }
+async function repoModel(sp){ const geo=geoForName(sp); if(!geo) return null; try{ const r=await fetch('/api/preview/model?geo='+encodeURIComponent(geo)).then(r=>r.json()); if(!r||r.error||!r.geo) return null; return {geo:r.geo,texUrl:r.texture,shinyUrl:r.shiny&&r.shiny!=='null'?r.shiny:null,anim:(r.animation&&r.animation.animations)?r.animation:null,src:'repo'}; }catch(e){ return null; } }
+async function packModel(sp){ if(!PD) return null; const R=(PD.groups&&PD.groups.resource)||{}; const models=R.models||[],texs=R.textures||[]; const base=norm(sp).split(/[ _]/)[0];
+  const nm=rel=>norm(rel.split('/').pop().replace(/\.geo\.json$|\.animation\.json$|\.json$|\.png$/i,''));
+  const mf=models.find(f=>nm(f.rel)===norm(sp))||models.find(f=>nm(f.rel)===base); if(!mf) return null;
+  const gr=await readJ(mf.rel); if(!gr||!gr['minecraft:geometry']) return null;
+  let texRel=null; const r=RES.find(r=>{const s=norm((r.j&&r.j.species||r.species||'').split(':').pop()); return s===norm(sp)||s===base;});
+  const rj=r?(r.j||r):null; if(rj){ const v=(rj.variations||[]).find(v=>v.texture); if(v&&v.texture) texRel=assetRel(v.texture); }
+  if(!texRel){ const tf=texs.find(f=>nm(f.rel)===norm(sp))||texs.find(f=>nm(f.rel)===base); texRel=tf?tf.rel:null; }
+  const img=async rel=>{ if(!rel) return null; try{ const im=await csInvoke('read_pack_image',{path:PROJECT.root,rel}); return im&&im.base64?'data:image/png;base64,'+im.base64:null; }catch(e){ return null; } };
+  const texUrl=await img(texRel); const shinyUrl=texRel?await img(texRel.replace(/\.png$/i,'_shiny.png')):null;
+  let anim=null; const af=await readJ(mf.rel.replace(/\.geo\.json$/i,'.animation.json')); if(af&&af.animations) anim=af;
+  return {geo:gr, texUrl, shinyUrl, anim, src:'pack', texRel, modelRel:mf.rel}; }
+async function packTexOnly(sp){ if(!PD) return null; const R=(PD.groups&&PD.groups.resource)||{}; const texs=R.textures||[]; const base=norm(sp).split(/[ _]/)[0]; const nm=rel=>norm(rel.split('/').pop().replace(/\.png$/i,''));
+  let texRel=null; const r=RES.find(r=>{const s=norm((r.species||'').split(':').pop()); return s===norm(sp)||s===base;}); if(r){ const v=(r.variations||[]).find(v=>v.texture); if(v&&v.texture) texRel=assetRel(v.texture); }
+  if(!texRel){ const tf=texs.find(f=>nm(f.rel)===norm(sp))||texs.find(f=>nm(f.rel)===base); texRel=tf?tf.rel:null; }
+  if(!texRel) return null; const img=async rel=>{ try{ const im=await csInvoke('read_pack_image',{path:PROJECT.root,rel}); return im&&im.base64?'data:image/png;base64,'+im.base64:null; }catch(e){ return null; } };
+  const texUrl=await img(texRel); if(!texUrl) return null; const shinyUrl=await img(texRel.replace(/\.png$/i,'_shiny.png')); return {texRel,texUrl,shinyUrl}; }
+async function getModelFic(sp){ if(modelCache.has(sp)) return modelCache.get(sp); let m=await packModel(sp);
+  if(!m){ m=await repoModel(sp); if(m){ const pt=await packTexOnly(sp); if(pt){ m.texUrl=pt.texUrl; m.shinyUrl=pt.shinyUrl||null; m.texRel=pt.texRel; m.modelRel=null; m.src='packtex'; } } }   // modelo del repo + textura de TU pack (reskins) → editable y cuenta como del pack
+  modelCache.set(sp,m||null); return m; }
+function texFromImg(img){ if(!img) return null; const t=new THREE.Texture(img); t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestFilter; t.generateMipmaps=false; t.needsUpdate=true; return t; }
+function idleClipFor(m){ if(!m) return null; if(m._clip!==undefined) return m._clip; let c=null; if(m.anim&&window.buildAnimClip){ const names=Object.keys(m.anim.animations||{}); const pick=names.find(n=>/ground_idle/i.test(n))||names.find(n=>/(^|\.)idle/i.test(n))||names.find(n=>!/faint|cry|recoil|evolv/i.test(n))||names[0]; try{ c=window.buildAnimClip(m.anim,pick); }catch(e){} } m._clip=c; return c; }
+function frame34(obj,cam){ obj.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(obj); if(b.isEmpty()){ cam.position.set(0,0,40); cam.lookAt(0,0,0); return; } const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const fov=(cam.fov||34)*Math.PI/180; const half=Math.max(s.x,s.y)/2||8; const d=(half/Math.tan(fov/2))*1.3 + s.z/2 + 2; cam.position.set(c.x,c.y,c.z-d); cam.near=Math.max(.05,d*0.02); cam.far=d*8+s.z*6; cam.lookAt(c.x,c.y,c.z); cam.updateProjectionMatrix(); }
+function faceCamera(grp){ if(grp){ grp.rotation.set(0,0,0); grp.updateMatrixWorld(true); } }
+
+// ===== visor 3D (un contexto, idle + giro) =====
+let vR=null,vS=null,vC=null,vRaf=null,vGrp=null,vClip=null,vStart=0,curModel=null,showShiny=false,viewReq=0,grpReq=0;
+function vLoop(){ vRaf=requestAnimationFrame(vLoop); const st=$('ficStage'); if(st&&vR){ const w=st.clientWidth||340,h=st.clientHeight||300; const cv=vR.domElement; if(cv.width!==w||cv.height!==h){ vR.setSize(w,h,false); vC.aspect=w/h; vC.updateProjectionMatrix(); } }
+  if(vGrp){ if(vClip&&window.applyAnimClip){ try{ window.applyAnimClip(vGrp,vClip,((performance.now()-vStart)/1000)%(vClip.length||1)); }catch(e){} } vGrp.rotation.y+=0.008; }
+  if(vR) vR.render(vS,vC); }
+function ensureViewer(){ const cv=$('ficCanvas'); if(!cv) return; if(vR&&vR.domElement!==cv){ try{ vR.dispose&&vR.dispose(); }catch(e){} vR=vS=vC=null; vGrp=null; }   // render() recrea el canvas en cada foco → reenlazar el renderer
+  if(!vR){ vR=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true}); vR.setClearColor(0x000000,0); vR.setPixelRatio(Math.min(devicePixelRatio,2)); vS=new THREE.Scene(); vS.add(new THREE.AmbientLight(0xffffff,0.95)); const d=new THREE.DirectionalLight(0xffffff,0.9); d.position.set(40,60,50); vS.add(d); const d2=new THREE.DirectionalLight(0xbcd2ff,0.4); d2.position.set(-40,10,-30); vS.add(d2); vC=new THREE.PerspectiveCamera(34,1,0.1,5000); vC.position.set(0,8,40); } if(vRaf==null) vLoop(); }
+function disposeGrp(g){ if(!g) return; g.traverse(o=>{ if(o.isMesh){ o.geometry&&o.geometry.dispose(); const m=o.material; if(m){ (Array.isArray(m)?m:[m]).forEach(mt=>{ if(mt.map) mt.map.dispose(); mt.dispose&&mt.dispose(); }); } } }); }
+function rebuildGrp(){ if(vGrp){ disposeGrp(vGrp); vS.remove(vGrp); vGrp=null; vClip=null; } if(!curModel||!vS) return; const target=curModel, my=++grpReq; const url=(showShiny&&target.shinyUrl)?target.shinyUrl:target.texUrl;
+  loadImg(url).then(img=>{ if(my!==grpReq||curModel!==target||!vS) return; const g=window.geoToThreeGroup(target.geo, texFromImg(img)); faceCamera(g); vClip=idleClipFor(target); vS.add(g); vGrp=g; frame34(g,vC); vStart=performance.now(); }); }
+function toggleShiny(){ if(!curModel||!curModel.shinyUrl){ toast('Este Pokémon no tiene textura shiny en el pack','info'); return; } showShiny=!showShiny; const b=$('shinyBtn'); if(b) b.classList.toggle('on',showShiny); rebuildGrp(); }
+
+// ===== render de la ficha =====
+let focusSp=null;
+function dexText(j){ if(!j) return ''; if(typeof j.description==='string') return j.description; const f=(j.forms||[])[0]; if(f&&typeof f.description==='string') return f.description; if(Array.isArray(j.entries)&&j.entries[0]&&typeof j.entries[0].description==='string') return j.entries[0].description; return ''; }
+function typeBadge(t){ const k=norm(t); const col=TYPE_COL[k]||'#888'; return '<span class="ftype" style="background:'+col+'">'+esc(TYPE_ES[k]||cap(k))+'</span>'; }
+function statColor(v){ const h=Math.max(0,Math.min(120, v/180*120)); return 'hsl('+h+',65%,48%)'; }
+async function render(){ const wrap=$('wrap');
+  if(!PROJECT||!PROJECT.root){ wrap.innerHTML='<div class="fic-empty"><div class="big">📦</div><div>No hay ningún pack abierto. Abre o crea uno desde el Inicio.</div></div>'; return; }
+  if(!focusSp){ const pack=[...PACKSET].sort();
+    const body = pack.length
+      ? '<div>Elige uno de tus Pokémon para ver su <b>ficha</b> y qué le falta:</div><div class="fic-chips">'+pack.map(sp=>'<button class="fic-chip" data-sp="'+esc(sp)+'">'+esc(cap(sp))+'</button>').join('')+'</div>'
+      : '<div>Tu pack aún no tiene Pokémon. Créalos en <b>Crear → Pokémon nuevo</b>.</div>';
+    wrap.innerHTML='<div class="fic-empty" style="max-width:560px"><div class="big">👁️</div>'+body+'</div>';
+    wrap.querySelectorAll('.fic-chip').forEach(b=>b.onclick=()=>setFocus(b.dataset.sp)); return; }
+  const sp=focusSp; const spec=SPECIES.get(sp); const j=spec?spec.j:null; const dexE=DEXE.get(sp); const spawns=SPAWNS.get(sp)||[]; const dexNo=(j&&(j.nationalPokedexNumber))||DEX.get(sp);
+  showShiny=false; curModel=null;
+  const t1=j&&j.primaryType, t2=j&&j.secondaryType;
+  const stats=j&&j.baseStats||null; const bst=stats?STAT_ROWS.reduce((a,[k])=>a+(+stats[k]||0),0):0;
+  const flav=dexText(dexE);
+  const ab=(j&&j.abilities||[]).map(a=>cap(String(a).replace(/^h:/,'').replace(/:.*/,''))).filter(Boolean);
+  const egg=(j&&j.eggGroups||[]).map(cap);
+  // tarjeta
+  let right='';
+  right+='<div style="display:flex;justify-content:flex-end"><button class="btn small" onclick="callParent(\'csEditCase\',focusSp)" title="Abrir el editor avanzado de este caso">🔧 Editar a fondo</button></div>';
+  right+='<div class="fic-sec"><h3>Pokédex</h3><div class="fic-dex">'+(flav?esc(flav):(dexE?'<span class="fic-note">Entrada presente (sin texto descriptivo).</span>':'<span class="fic-note">Sin entrada de Pokédex en tu pack.</span>'))+'</div></div>';
+  if(stats){ right+='<div class="fic-sec"><h3>Estadísticas base</h3>'+STAT_ROWS.map(([k,lab])=>{ const v=+stats[k]||0; return '<div class="stat"><span class="sl">'+lab+'</span><span class="sv">'+v+'</span><span class="bar"><i style="width:'+Math.max(2,Math.min(100,v/180*100))+'%;background:'+statColor(v)+'"></i></span></div>'; }).join('')+'<div class="fic-bst"><span>Total base</span><b>'+bst+'</b></div></div>'; }
+  // spawn
+  if(spawns.length){ right+='<div class="fic-sec"><h3>Aparición</h3>'+spawns.map(s=>{ const bio=[].concat(s.biomes||s.condition&&s.condition.biomes||[]).map(b=>String(b).split(':').pop().replace(/^#/,'')).slice(0,4); return '<div class="fic-spawn"><span class="pill">'+esc(cap(s.bucket||'común'))+'</span>'+(s.level?'<span>Nivel <b style="color:var(--text)">'+esc(s.level)+'</b></span>':'')+(bio.length?'<span>· '+bio.map(esc).join(', ')+'</span>':'')+'</div>'; }).join('')+'</div>'; }
+  // detalles
+  const det=[]; if(ab.length) det.push('<span>Habilidades: <b>'+ab.map(esc).join(', ')+'</b></span>'); if(egg.length) det.push('<span>Huevo: <b>'+egg.map(esc).join(', ')+'</b></span>'); if(j&&j.catchRate!=null) det.push('<span>Captura: <b>'+esc(j.catchRate)+'</b></span>'); if(j&&j.weight!=null) det.push('<span>Peso: <b>'+esc(j.weight)+'</b></span>');
+  if(det.length) right+='<div class="fic-sec"><h3>Detalles</h3><div class="kv">'+det.join('')+'</div></div>';
+  // checklist accionable (validar + ir a crear/editar)
+  right+='<div class="fic-sec"><h3>Estado · pulsa para crear o editar</h3><div class="fic-check" id="ficChecks"></div></div>';
+  if(!j) right+='<div class="fic-note">Los datos base (tipos/estadísticas) solo se muestran para Pokémon definidos en tu pack.</div>';
+
+  wrap.innerHTML='<div class="fic-card">'+
+    '<div class="fic-left">'+
+      '<div class="fic-stage" id="ficStage"><canvas id="ficCanvas"></canvas></div>'+
+      '<button class="btn small fic-shiny" id="shinyBtn" onclick="toggleShiny()" title="Ver textura shiny">✨ Shiny</button>'+
+      '<div class="fic-idhdr"><div class="dex">'+(dexNo!=null?('Nº '+dexNo):'')+'</div><div class="nm">'+esc(cap(sp))+'</div><div class="fic-types">'+(t1?typeBadge(t1):'')+(t2?typeBadge(t2):'')+(!t1&&!t2?'<span class="fic-note">tipos no incluidos</span>':'')+'</div></div>'+
+    '</div>'+
+    '<div class="fic-right">'+right+'</div>'+
+  '</div>';
+  ensureViewer(); renderChecks(sp);
+  const my=++viewReq; const m=await getModelFic(sp); if(my!==viewReq) return; curModel=m;
+  renderChecks(sp);
+  const sb=$('shinyBtn'); if(sb) sb.style.display=(m&&m.shinyUrl)?'':'none';
+  rebuildGrp(); }
+function renderChecks(sp){ const cont=$('ficChecks'); if(!cont) return; const j=(SPECIES.get(sp)||{}).j; const dexE=DEXE.get(sp); const spawns=SPAWNS.get(sp)||[]; const m=curModel;
+  const isPack=m&&(m.src==='pack'||m.src==='packtex');   // verde = está en TU pack (no el modelo vanilla del repo)
+  const checks=[
+    {k:'modelo',label:'Modelo 3D',ok:!!isPack,act:()=>{ if(m&&m.texRel) callParent('csEditTexture',m.texRel,m.modelRel||null); else toast('Modelo del repositorio (sin textura editable en tu pack)','info'); }},
+    {k:'datos',label:'Datos',ok:!!j,act:()=> j?callParent('csEditCase',sp,'pokemon'):callParent('navCreator')},
+    {k:'pokedex',label:'Pokédex',ok:!!dexE,act:()=> dexE?callParent('csEditCase',sp,'dexEntry'):callParent('csOpenAssist','pokedex',{'.e-species':nsDe(sp)+':'+sp})},
+    {k:'aparicion',label:'Aparición',ok:!!spawns.length,act:()=> spawns.length?callParent('csEditCase',sp,'spawn'):callParent('csOpenAssist','aparezca',{'.ws-mon':sp})},
+    {k:'shiny',label:'Shiny',ok:!!(isPack&&m.shinyUrl),act:()=>{ if(m&&m.texRel) callParent('csEditTexture',m.texRel,m.modelRel||null); else toast('Añade primero el modelo/textura en tu pack','info'); }},
+  ];
+  cont.innerHTML=checks.map(c=>'<button class="chk '+(c.ok?'chkok':'chkno')+'" data-k="'+c.k+'" title="'+(c.ok?'Editar':'Crear / añadir')+'">'+esc(c.label)+' <span class="act">'+(c.ok?'✏️':'➕')+'</span></button>').join('');
+  cont.querySelectorAll('.chk').forEach(el=>{ const c=checks.find(x=>x.k===el.dataset.k); if(c) el.onclick=c.act; }); }
+
+// ===== buscador =====
+function candidates(q){ q=norm(q); let list=[...PACKSET]; if(q) list=list.filter(s=>s.includes(q)); list.sort((a,b)=>a.localeCompare(b)); return list.slice(0,500); }   // SOLO Pokémon de tu pack
+function onSearch(){ const q=$('ficSearch').value; const pick=$('ficPick'); const list=candidates(q); if(!list.length){ pick.classList.remove('open'); pick.innerHTML='<div class="pk" style="cursor:default;color:var(--faint)">'+(PACKSET.size?'sin resultados':'Tu pack aún no tiene Pokémon')+'</div>'; pick.classList.add('open'); return; }
+  pick.innerHTML=list.map(sp=>{ const dx=DEX.has(sp)?('<span class="dx">Nº '+DEX.get(sp)+'</span>'):''; return '<div class="pk" data-sp="'+esc(sp)+'">'+esc(cap(sp))+dx+'</div>'; }).join('');
+  pick.querySelectorAll('.pk').forEach(el=>el.dataset.sp&&(el.onclick=()=>setFocus(el.dataset.sp))); pick.classList.add('open'); }
+document.addEventListener('click',e=>{ if(!e.target.closest('.fic-search')){ const p=$('ficPick'); if(p) p.classList.remove('open'); } });
+function setFocus(sp){ focusSp=norm(sp); $('ficSearch').value=cap(focusSp); $('ficPick').classList.remove('open'); render(); }
+
+// ===== puente / arranque =====
+window.csFichaFocus=function(sp){ if(sp) setFocus(sp); };
+async function reload(){ modelCache.clear(); await scanPack(); render(); }
+(async function init(){ await loadCatalog(); if(PROJECT&&PROJECT.root){ await scanPack(); } let f=null; try{ f=localStorage.getItem('cs_ficha_focus'); if(f) localStorage.removeItem('cs_ficha_focus'); }catch(e){} if(f) setFocus(f); else render(); })();
+</script>
+</body></html>

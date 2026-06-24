@@ -423,7 +423,7 @@
       <a class="snav-item" data-nav="reskin" onclick="navReskin()">Reskin / aspecto</a>
       <a class="snav-item" data-nav="variante" onclick="assistant('variante')">Forma regional</a>
       <a class="snav-item" data-nav="complemento" onclick="assistant('complemento')">Cosmético</a>
-      <a class="snav-item" data-nav="evolucion" onclick="assistant('evolucion')">Evolución</a>
+      <a class="snav-item" data-nav="evos" onclick="navEvolution()">Evolución</a>
     </div>
   </div>
 
@@ -2243,6 +2243,8 @@ const FRAME_PAGES={
   anim:   { url:'/anim.html?embed=1', title:'Modo animar', icon:'🎞️', nav:'anim' },
   mypack: { url:'/mypack.html?embed=1', title:'Editar mi pack', icon:'✏️', nav:'editpack' },
   doctor: { url:'/doctor.html?embed=1', title:'Doctor del pack', icon:'🩺', nav:'doctor' },
+  evos:   { url:'/evos.html?embed=1', title:'Cadenas de evolución', icon:'🔀', nav:'evos' },
+  ficha:  { url:'/ficha.html?embed=1', title:'Ficha de juego', icon:'👁️', nav:'editpack' },
   export: { url:'/export.html?embed=1', title:'Exportar .zip', icon:'⬇️', nav:'exportar' },
 };
 function setFrameMode(on){   // alterna entre el contenido normal (.wrap+.foot) y el host de iframes
@@ -2269,11 +2271,22 @@ function openFrameTab(key){ if(!lastRoot){ showLauncher(); return; } const p=FRA
 function navCreator(){ openFrameTab('creator'); }
 function navReskin(){ openFrameTab('reskin'); }
 function navPaint(){ openFrameTab('paint'); }
+function csEditTexture(rel, modelRel){ if(!rel) return;   // «Editar mi pack» → abre el Editor PNG con esta textura del pack cargada (y su modelo, para las islas UV)
+  const f0=document.querySelector('#frameScreen iframe[data-frame="paintpng"]'); const ready=!!(f0&&f0.contentWindow&&f0.contentWindow.csOpenPackTexture);
+  if(!ready){ try{ const cur=JSON.parse(localStorage.getItem('cs_current')||'null'); localStorage.setItem('cs_paint_open', JSON.stringify({root:cur&&cur.root, rel, model:modelRel||null})); }catch(e){} }
+  openFrameTab('paintpng');
+  const f=document.querySelector('#frameScreen iframe[data-frame="paintpng"]');
+  if(f&&f.contentWindow&&f.contentWindow.csOpenPackTexture){ try{ f.contentWindow.csOpenPackTexture(rel, modelRel||null); localStorage.removeItem('cs_paint_open'); }catch(e){} }
+}
 function navPaintPng(){ openFrameTab('paintpng'); }
 function navPhoto(){ openFrameTab('photo'); }
 function navAnim(){ openFrameTab('anim'); }
 function navEditPack(){ openFrameTab('mypack'); }
 function navDoctor(){ openFrameTab('doctor'); }
+function navEvolution(){ openFrameTab('evos'); }
+function csOpenFicha(sp){ const f0=document.querySelector('#frameScreen iframe[data-frame="ficha"]'); const ready=!!(f0&&f0.contentWindow&&f0.contentWindow.csFichaFocus); if(sp&&!ready){ try{ localStorage.setItem('cs_ficha_focus', sp); }catch(e){} } openFrameTab('ficha'); const f=document.querySelector('#frameScreen iframe[data-frame="ficha"]'); if(sp&&f&&f.contentWindow&&f.contentWindow.csFichaFocus){ try{ f.contentWindow.csFichaFocus(sp); localStorage.removeItem('cs_ficha_focus'); }catch(e){} } }
+function csEditCase(sp,type){ const ex=document.querySelector('#frameScreen iframe[data-frame="mypack"]'); if(sp&&(!ex||!ex.contentWindow||!ex.contentWindow.csOpenCaseBySpecies)){ try{ localStorage.setItem('cs_mypack_modal', sp+(type?'|'+type:'')); }catch(e){} } openFrameTab('mypack'); const f=document.querySelector('#frameScreen iframe[data-frame="mypack"]'); if(sp&&f&&f.contentWindow&&f.contentWindow.csOpenCaseBySpecies){ try{ f.contentWindow.csOpenCaseBySpecies(sp,type); }catch(e){} } }
+function csOpenEvos(sp){ const f0=document.querySelector('#frameScreen iframe[data-frame="evos"]'); const ready=!!(f0&&f0.contentWindow&&f0.contentWindow.csEvosFocus); if(sp&&!ready){ try{ localStorage.setItem('cs_evos_focus', sp); }catch(e){} } openFrameTab('evos'); const f=document.querySelector('#frameScreen iframe[data-frame="evos"]'); if(sp&&f&&f.contentWindow&&f.contentWindow.csEvosFocus){ try{ f.contentWindow.csEvosFocus(sp); localStorage.removeItem('cs_evos_focus'); }catch(e){} } }
 // ===== Modo edición: editar un caso del pack (lo llama mypack.html) =====
 function csEditFiles(rels){ if(!rels||!rels.length) return; pkPendingOpen=rels[0]; navPack(); }   // renderPackHome abre el archivo pendiente cuando el DOM está listo (no por timeout)
 function pkCatOfRel(rel){ try{ const g=pkDetail&&pkDetail.groups; if(g) for(const grp in g){ for(const cat in g[grp]){ if((g[grp][cat]||[]).some(it=>it.rel===rel)) return cat; } } }catch(e){}
@@ -2666,7 +2679,7 @@ function restoreSidebar(){ try{ const w=localStorage.getItem('cs_side_w'); if(w)
   window.addEventListener('pointermove',e=>{ if(!dz) return; const nw=Math.max(150,Math.min(380,dz.w+(e.clientX-dz.x))); document.documentElement.style.setProperty('--side-w',nw+'px'); });
   window.addEventListener('pointerup',()=>{ if(dz){ try{ localStorage.setItem('cs_side_w', Math.round($('appside').getBoundingClientRect().width)); }catch(e){} dz=null; } });
 })();
-function applyGoParam(){ try{ const g=new URLSearchParams(location.search).get('go'); if(!g) return; const map={nuevo:()=>location.href='/creator.html',aspecto:()=>assistant('aspecto'),variante:()=>assistant('variante'),complemento:()=>assistant('complemento'),evolucion:()=>assistant('evolucion'),aparezca:()=>assistant('aparezca'),montar:()=>assistant('montar'),pokedex:()=>assistant('pokedex'),berry:()=>assistant('berry'),fossil:()=>assistant('fossil'),mark:()=>assistant('mark'),pokerod:()=>assistant('pokerod'),seasoning:()=>assistant('seasoning'),recipe:()=>assistant('recipe'),textos:()=>assistant('textos'),explorar:()=>navPack(),estado:()=>navPack(),exportar:()=>navExport(),guia:()=>navGuide()}; (map[g]||(()=>{}))(); }catch(e){} }
+function applyGoParam(){ try{ const g=new URLSearchParams(location.search).get('go'); if(!g) return; const map={nuevo:()=>location.href='/creator.html',aspecto:()=>assistant('aspecto'),variante:()=>assistant('variante'),complemento:()=>assistant('complemento'),evolucion:()=>navEvolution(),aparezca:()=>assistant('aparezca'),montar:()=>assistant('montar'),pokedex:()=>assistant('pokedex'),berry:()=>assistant('berry'),fossil:()=>assistant('fossil'),mark:()=>assistant('mark'),pokerod:()=>assistant('pokerod'),seasoning:()=>assistant('seasoning'),recipe:()=>assistant('recipe'),textos:()=>assistant('textos'),explorar:()=>navPack(),estado:()=>navPack(),exportar:()=>navExport(),guia:()=>navGuide()}; (map[g]||(()=>{}))(); }catch(e){} }
 
 // ===== LAUNCHER / PROYECTO (modelo IDE: siempre hay un pack abierto) =====
 async function apiPost(url, body){ try{ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return await r.json(); }catch(e){ return {error:'No se pudo conectar con la app: '+e.message}; } }
@@ -2699,6 +2712,7 @@ function openProject(root, name){
   assistKind=null; asstCurId=null;
   document.body.classList.remove('assist','asst-model');
   document.querySelectorAll('#frameScreen iframe').forEach(f=>{ try{ f.src='about:blank'; }catch(e){} f.remove(); });   // libera WebGL/recursos de iframes del pack anterior (PROJECT stale)
+  ['cs_evos_focus','cs_ficha_focus','cs_mypack_modal','cs_paint_open'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });   // sin foco/modal fantasma del pack anterior
   navHome(); refreshPackInfo();
 }
 // restaura el pack abierto (cs_current) entre páginas; solo pide elegir si no hay ninguno o ya no existe

@@ -1,0 +1,401 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cobblemon Studio — Cadenas de evolución</title>
+<link rel="stylesheet" href="/studio.css">
+<script>(function(){ if(new URLSearchParams(location.search).get('embed')==='1') document.documentElement.classList.add('embed'); })();</script>
+<script src="/tauri-shim.js"></script>
+<script src="/vendor/three.min.js"></script>
+<script src="/vendor/OrbitControls.js"></script>
+<script src="/geo-three-reference.js"></script>
+<script src="/anim-bedrock.js"></script>
+<script src="/ctxmenu.js"></script>
+<style>
+  .ev{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg)}
+  .ev-top{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .ev-top h1{margin:0;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .ev-search{position:relative;flex:1;min-width:200px;max-width:420px}
+  .ev-search input{width:100%}
+  .ev-pick{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--panel);border:1px solid var(--line2);border-radius:10px;max-height:320px;overflow:auto;box-shadow:0 14px 40px rgba(0,0,0,.5);display:none}
+  .ev-pick.open{display:block}
+  .ev-pick .pk{display:flex;align-items:center;gap:8px;padding:7px 11px;cursor:pointer;text-transform:capitalize;font-size:13px}
+  .ev-pick .pk:hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  .ev-pick .pk .dx{margin-left:auto;color:var(--faint);font-size:11px;font-variant-numeric:tabular-nums}
+  .ev-pick .pk .tag{font-size:10px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .ev-banner{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 16px;background:color-mix(in srgb,var(--warn) 12%,transparent);border-bottom:1px solid var(--line);color:var(--text);font-size:12px}
+  .ev-wrap{flex:1 1 auto;min-height:0;overflow:auto;position:relative}
+  .ev-canvas{position:relative;min-width:100%;min-height:100%;display:flex;align-items:center;gap:0;padding:40px 30px}
+  .ev-edges{position:absolute;inset:0;pointer-events:none;z-index:1}
+  .ev-col{display:flex;flex-direction:column;justify-content:center;gap:34px;position:relative;z-index:2;padding:0 46px}
+  .ev-node{width:148px;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 10px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;transition:border-color .15s,transform .15s}
+  .ev-node:hover{border-color:var(--line2);transform:translateY(-2px)}
+  .ev-node.focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
+  .ev-node.ghost{opacity:.62;border-style:dashed}
+  .ev-node .pic{width:120px;height:120px;border-radius:10px;background:radial-gradient(circle at 50% 35%, #20262f, #12151b);display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .ev-node .pic img{width:100%;height:100%;object-fit:contain;image-rendering:auto}
+  .ev-node .pic .ld{width:20px;height:20px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:evspin .7s linear infinite}
+  .ev-node .pic .qm{font-size:34px;opacity:.4}
+  @keyframes evspin{to{transform:rotate(360deg)}}
+  .ev-node .nm{font-weight:700;font-size:13px;text-transform:capitalize;text-align:center;line-height:1.15}
+  .ev-node .meta{display:flex;gap:6px;align-items:center;font-size:10.5px;color:var(--faint)}
+  .ev-node .meta .chip{border:1px solid var(--line);border-radius:5px;padding:0 5px}
+  .ev-node .meta .chip.pack{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+  .ev-node .addb{position:absolute;top:-9px;right:-9px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--on-accent);border:none;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  .ev-node .addb:hover{background:var(--accent2)}
+  .ev-lbl{position:absolute;z-index:3;transform:translate(-50%,-50%);background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:4px 7px;font-size:11px;display:flex;align-items:center;gap:6px;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .ev-lbl .t{cursor:pointer}
+  .ev-lbl .t:hover{color:var(--accent)}
+  .ev-lbl button{border:none;background:transparent;cursor:pointer;font-size:12px;padding:0 1px;line-height:1}
+  .ev-lbl .play{color:var(--accent)}
+  .ev-lbl .del{color:var(--faint)}
+  .ev-lbl .del:hover{color:var(--err)}
+  .ev-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .ev-empty .card{background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:26px 30px;text-align:center;max-width:340px;display:flex;flex-direction:column;gap:12px;align-items:center}
+  .ev-empty .card .pic{width:120px;height:120px}
+  .ev-empty .card h2{margin:0;font-size:18px;text-transform:capitalize}
+  .ev-empty .card p{margin:0;color:var(--dim);font-size:13px;line-height:1.5}
+  .ev-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:2px;max-height:46vh;overflow:auto}
+  .ev-chip{text-transform:capitalize;font-size:12px;padding:6px 11px;border-radius:8px;background:var(--panel);border:1px solid var(--line);cursor:pointer;color:var(--text)}
+  .ev-chip:hover{border-color:var(--accent);color:var(--accent)}
+  /* modales */
+  .ev-ov{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:5vh 18px}
+  .ev-ov.open{display:flex}
+  .ev-dlg{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:18px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 50px rgba(0,0,0,.5);max-height:86vh;overflow:auto}
+  .ev-dlg h3{margin:0;font-size:15px;display:flex;align-items:center;justify-content:space-between}
+  .ev-dlg h3 span{cursor:pointer;color:var(--faint)}
+  .ev-dlg label{display:block;font-size:11px;color:var(--dim);margin:8px 0 3px}
+  .ev-dlg input,.ev-dlg select{width:100%}
+  .ev-seg{display:flex;gap:0}
+  .ev-seg .btn{flex:1;justify-content:center;border-radius:0;margin-left:-1px}
+  .ev-seg .btn:first-child{border-top-left-radius:var(--r1);border-bottom-left-radius:var(--r1);margin-left:0}
+  .ev-seg .btn:last-child{border-top-right-radius:var(--r1);border-bottom-right-radius:var(--r1)}
+  .ev-seg .btn.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  /* visor de evolución (animación) */
+  .ev-play .ev-dlg{max-width:520px;align-items:stretch}
+  .ev-stagewrap{position:relative;border-radius:12px;overflow:hidden;background:radial-gradient(circle at 50% 40%, #1a2330, #0a0c10)}
+  #evoStage{position:relative;width:100%;height:300px}
+  #evoCanvas{width:100%;height:100%;display:block}
+  .ev-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+  .ev-play-cap{text-align:center;font-weight:700;text-transform:capitalize;font-size:15px;margin-top:4px}
+  .ev-play-cap b{color:var(--accent)}
+  .ev-mini{display:flex;align-items:center;justify-content:center;gap:12px;color:var(--dim);font-size:12px}
+</style></head>
+<body>
+<div class="ev">
+  <div class="ev-top">
+    <h1>🔀 Cadenas de evolución</h1>
+    <div class="ev-search">
+      <input type="text" id="rootSearch" placeholder="🔍 Elige un Pokémon…" oninput="onSearch()" onfocus="onSearch()" autocomplete="off">
+      <div class="ev-pick" id="rootPick"></div>
+    </div>
+    <button class="btn small" onclick="reload()" title="Volver a leer el pack">↺ Recargar</button>
+  </div>
+  <div class="ev-banner" id="vanillaBanner" style="display:none">ⓘ No se conocen las evoluciones base de Cobblemon: aquí solo se muestra lo que hay <b>en tu pack</b>.</div>
+  <div class="ev-wrap" id="wrap">
+    <div class="ev-canvas" id="canvas"><div class="ev-empty"><div class="card"><div class="pic"><span class="qm">🔀</span></div><h2>Cadenas de evolución</h2><p>Busca un Pokémon arriba para ver y editar su cadena de evolución.</p></div></div></div>
+  </div>
+</div>
+
+<!-- modal: añadir / editar una evolución -->
+<div class="ev-ov" id="formOv">
+  <div class="ev-dlg">
+    <h3 id="formTitle">Nueva evolución <span onclick="closeForm()" title="Cerrar">✕</span></h3>
+    <div class="ev-mini"><b id="formFrom" style="text-transform:capitalize"></b> <span>→</span> <span style="color:var(--faint)">resultado:</span></div>
+    <label>Pokémon resultado (al que evoluciona)</label>
+    <div class="ev-search" style="max-width:none">
+      <input type="text" id="fResult" placeholder="Escribe o elige de la lista…" autocomplete="off" oninput="fResultSearch()" onfocus="fResultSearch()">
+      <div class="ev-pick" id="fResultPick" style="max-height:220px"></div>
+    </div>
+    <label>Cómo evoluciona</label>
+    <div class="ev-seg" id="fKind">
+      <button class="btn small on" data-k="level" onclick="pickKind('level')" title="Al subir a un nivel">Nivel</button>
+      <button class="btn small" data-k="stone" onclick="pickKind('stone')" title="Al usar una piedra/objeto">Piedra</button>
+      <button class="btn small" data-k="trade" onclick="pickKind('trade')" title="Al intercambiar">Intercambio</button>
+      <button class="btn small" data-k="friendship" onclick="pickKind('friendship')" title="Con amistad alta">Amistad</button>
+    </div>
+    <div id="fLevelBox"><label>Nivel mínimo</label><input type="number" id="fLevel" value="16" min="1" max="100"></div>
+    <div id="fItemBox" style="display:none"><label>Piedra / objeto</label><input type="text" id="fItem" value="cobblemon:fire_stone" placeholder="cobblemon:fire_stone"><label class="row2" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="fConsume" style="width:auto"> Consumir el objeto</label></div>
+    <div id="fAmountBox" style="display:none"><label>Amistad mínima</label><input type="number" id="fAmount" value="160" min="0" max="255"></div>
+    <details id="fCondWrap" style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--dim)">Condiciones extra (opcional)</summary>
+      <div id="fConds"></div>
+      <button class="btn small" type="button" onclick="addCond()" style="margin-top:8px;width:100%">➕ Añadir condición</button>
+      <div class="ev-mini" style="margin-top:6px;font-size:11px;color:var(--faint)">Se pueden combinar varias (p. ej. nivel + de noche + en cierto bioma).</div>
+    </details>
+    <label class="row2" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);margin-top:10px"><input type="checkbox" id="fPreevo" checked style="width:auto"> Marcar la preevolución en el resultado</label>
+    <div class="row2" style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn small" onclick="closeForm()">Cancelar</button><button class="btn small primary" id="fSave" onclick="saveEvo()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- modal: visor de evolución (animación) -->
+<div class="ev-ov ev-play" id="playOv">
+  <div class="ev-dlg">
+    <h3>Evolución <span onclick="closeEvoPlay()" title="Cerrar">✕</span></h3>
+    <div class="ev-stagewrap"><div id="evoStage"><canvas id="evoCanvas"></canvas></div><div class="ev-flash" id="evoFlash"></div></div>
+    <div class="ev-play-cap"><span id="evoFromN"></span> → <b id="evoToN"></b></div>
+    <div class="row2" style="display:flex;gap:8px;justify-content:center;margin-top:4px"><button class="btn small" onclick="closeEvoPlay()">Cerrar</button><button class="btn small primary" id="evoPlayBtn" onclick="playEvolution()">▶ Evolucionar</button></div>
+  </div>
+</div>
+
+<div id="toaster" class="toaster"></div>
+<script>
+const $=id=>document.getElementById(id);
+const PROJECT=(()=>{ try{ return JSON.parse(localStorage.getItem('cs_current')||'null'); }catch(e){ return null; } })();
+async function csInvoke(cmd,args){ const T=window.__TAURI__; const inv=T&&((T.core&&T.core.invoke)||T.invoke); return inv?inv(cmd,args||{}):Promise.reject('no-tauri'); }
+function P(){ try{ return (window.parent&&window.parent!==window)?window.parent:null; }catch(e){ return null; } }
+function toast(msg,type){ const host=$('toaster'); if(!host) return; const t=document.createElement('div'); t.className='toast'+(type?' '+type:''); t.textContent=msg; host.appendChild(t); const close=()=>{ if(!t.parentNode)return; t.classList.add('out'); setTimeout(()=>t.parentNode&&t.parentNode.removeChild(t),300); }; const tm=setTimeout(close,3200); t.onclick=()=>{ clearTimeout(tm); close(); }; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function loadImg(url){ return new Promise(res=>{ if(!url) return res(null); const im=new Image(); im.onload=()=>res(im); im.onerror=()=>res(null); im.src=url; }); }
+const slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'');
+const norm=x=>String(x||'').toLowerCase().replace(/^[a-z0-9_]+:/,'').trim();   // quita namespace cobblemon:/mod:
+const cap=s=>String(s||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+const nsItem=s=>{ s=String(s||'').trim(); return s.includes(':')?s:'cobblemon:'+s; };
+const nsHeldItem=s=>{ s=String(s||'').trim(); if(!s) return s; if(s.startsWith('#')){ const t=s.slice(1); return '#'+(t.includes(':')?t:'minecraft:'+t); } return s.includes(':')?s:'minecraft:'+s; };   // objetos vanilla → minecraft: por defecto (no cobblemon:)
+
+// ===== catálogo de modelos (nombre→geo, nombre→dex) =====
+let CAT=[], NAME2GEO=new Map(), DEX=new Map();
+async function loadCatalog(){ try{ const r=await fetch('/api/preview/models').then(r=>r.json()); CAT=(r&&r.models)||[]; NAME2GEO.clear(); DEX.clear(); for(const m of CAT){ const n=norm(m.name); if(m.geo&&!NAME2GEO.has(n)) NAME2GEO.set(n,m.geo); if(m.dex!=null) DEX.set(n,m.dex); } }catch(e){ CAT=[]; } }
+
+// ===== render 3D de un modelo a imagen (cacheado por especie) =====
+let _off=null;
+function offRenderer(){ if(_off) return _off; const cv=document.createElement('canvas'); cv.width=cv.height=256; _off=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,preserveDrawingBuffer:true}); _off.setClearColor(0x000000,0); _off.setPixelRatio(1);
+  cv.addEventListener('webglcontextlost',e=>{ e.preventDefault(); _off=null; for(const [k,v] of [...stillCache]) if(v==null) stillCache.delete(k); });   // permitir reintentar miniaturas si se pierde el contexto
+  return _off; }
+const modelCache=new Map();   // name → {geo,texUrl} | null
+const stillCache=new Map();   // name → dataURL | null
+function geoForName(name){ if(NAME2GEO.has(name)) return NAME2GEO.get(name); const base=norm(name).split(/[ _]/)[0]; return NAME2GEO.get(base)||null; }   // "gabite female" → modelo de "gabite"
+async function getModel(name){ if(modelCache.has(name)) return modelCache.get(name); const geo=geoForName(name); if(!geo){ modelCache.set(name,null); return null; }
+  try{ const r=await fetch('/api/preview/model?geo='+encodeURIComponent(geo)).then(r=>r.json()); if(!r||r.error||!r.geo){ modelCache.set(name,null); return null; } const m={geo:r.geo,texUrl:r.texture,anim:(r.animation&&r.animation.animations)?r.animation:null}; modelCache.set(name,m); return m; }catch(e){ modelCache.set(name,null); return null; } }
+function idleClipFor(m){ if(!m) return null; if(m._clip!==undefined) return m._clip; let c=null; if(m.anim&&window.buildAnimClip){ const names=Object.keys(m.anim.animations||{}); const pick=names.find(n=>/ground_idle/i.test(n))||names.find(n=>/(^|\.)idle/i.test(n))||names.find(n=>!/faint|cry|recoil|evolv/i.test(n))||names[0]; try{ c=window.buildAnimClip(m.anim,pick); }catch(e){} } m._clip=c; return c; }
+function texFromImg(img){ if(!img) return null; const t=new THREE.Texture(img); t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestFilter; t.generateMipmaps=false; t.needsUpdate=true; return t; }
+function makeScene(grp){ const s=new THREE.Scene(); s.add(new THREE.AmbientLight(0xffffff,0.9)); const d=new THREE.DirectionalLight(0xffffff,0.85); d.position.set(40,60,50); s.add(d); const d2=new THREE.DirectionalLight(0xbcd2ff,0.35); d2.position.set(-40,10,-30); s.add(d2); s.add(grp); return s; }
+function faceCamera(grp){ if(grp){ grp.rotation.set(0,0,0); grp.updateMatrixWorld(true); } }   // front = +Z (convención de Modo foto); cámara frontal pura → de cara
+function frame34(obj,cam,dist){ obj.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(obj); if(b.isEmpty()){ cam.position.set(0,0,40); cam.lookAt(0,0,0); return {c:new THREE.Vector3(),r:16}; }
+  const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const fov=(cam.fov||34)*Math.PI/180; const half=Math.max(s.x,s.y)/2||8; const k=dist||1;
+  const d=(half/Math.tan(fov/2))*1.3*k + s.z/2 + 2;   // distancia que garantiza que cabe entero, centrado
+  cam.position.set(c.x, c.y, c.z-d); cam.near=Math.max(.05,d*0.02); cam.far=d*8+s.z*6; cam.lookAt(c.x,c.y,c.z); cam.updateProjectionMatrix(); return {c,r:half*2}; }   // -Z: el frente de estos modelos mira a -Z
+async function renderStill(name){ if(stillCache.has(name)) return stillCache.get(name); const m=await getModel(name); if(!m){ stillCache.set(name,null); return null; }
+  try{ const img=await loadImg(m.texUrl); const grp=window.geoToThreeGroup(m.geo, texFromImg(img)); const scene=makeScene(grp); faceCamera(grp);
+    const clip=idleClipFor(m); if(clip&&window.applyAnimClip){ try{ window.applyAnimClip(grp,clip,0.4); }catch(e){} }   // pose idle (no T-pose)
+    const cam=new THREE.PerspectiveCamera(34,1,0.1,5000); frame34(grp,cam); const rr=offRenderer(); rr.setSize(256,256,false); rr.render(scene,cam); const url=rr.domElement.toDataURL('image/png'); stillCache.set(name,url);
+    // liberar geometrías de este render (la imagen ya está cacheada)
+    grp.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(mt=>mt.dispose&&mt.dispose()); } });
+    return url; }catch(e){ stillCache.set(name,null); return null; } }
+async function fillStills(){ const imgs=[...document.querySelectorAll('.pic[data-sp]')]; for(const pic of imgs){ const sp=pic.dataset.sp; const url=await renderStill(sp); if(!document.body.contains(pic)) continue; pic.innerHTML = url? '<img src="'+url+'" alt="">' : '<span class="qm">❔</span>'; } }
+
+// ===== lectura del pack → grafo =====
+let GRAPH={nodes:new Map(), edges:[]}, focusSp=null, lastFiles={species:[],additions:[]}, colOf=new Map();
+function labelOf(ev){ const reqs=ev.requirements||[]; let main='Por nivel';
+  if(ev.variant==='item_interact'){ main='Piedra: '+cap((ev.requiredContext||'').split(':').pop()||'objeto'); }
+  else if(ev.variant==='trade'){ main='Intercambio'; }
+  else { const lv=reqs.find(r=>r&&r.variant==='level'); const fr=reqs.find(r=>r&&r.variant==='friendship'); if(lv) main='Nv.'+(lv.minLevel!=null?lv.minLevel:'?'); else if(fr) main='Amistad ≥'+(fr.amount!=null?fr.amount:'?'); }
+  const tr=reqs.find(r=>r&&r.variant==='time_range'); if(tr&&tr.range) main+=' · '+({day:'día',night:'noche',dusk:'atardecer',dawn:'amanecer'}[tr.range]||tr.range);
+  const bi=reqs.find(r=>r&&r.variant==='biome'); if(bi) main+=' · bioma';
+  const known=new Set(['level','friendship','time_range','biome']); if(reqs.some(r=>r&&!known.has(r.variant))) main+=' · +cond';
+  return main; }
+function addNode(sp,inPack){ sp=norm(sp); if(!sp) return; const cur=GRAPH.nodes.get(sp); if(!cur) GRAPH.nodes.set(sp,{sp,inPack:!!inPack,dex:DEX.get(sp)}); else if(inPack) cur.inPack=true; }
+async function scan(){ if(!PROJECT||!PROJECT.root) return false; GRAPH={nodes:new Map(),edges:[]};
+  const det=await csInvoke('pack_detail',{path:PROJECT.root}); const dp=(det.groups&&det.groups.datapack)||{};
+  const readJ=async rel=>{ try{ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel}); return r&&r.text?JSON.parse(r.text):null; }catch(e){ return null; } };
+  lastFiles={species:(dp.species||[]).map(f=>f.rel), additions:(dp.additions||[]).map(f=>f.rel)};
+  let synthN=0;   // ids sintéticos ÚNICOS por scan (las evos sin 'id' en disco no colapsan en el dedupe)
+  const pushEdges=(fromSp,rel,srcKind,evs,formIdx)=>{ (evs||[]).forEach((ev,i)=>{ if(!ev) return; const to=norm(ev.result); if(!to) return; addNode(fromSp,true); addNode(to,false);
+    GRAPH.edges.push({id:ev.id||('syn_'+slug(fromSp+'_'+to)+'_'+(synthN++)), hasId:!!ev.id, idx:i, formIdx:(formIdx==null?null:formIdx), from:norm(fromSp), to, variant:ev.variant||'level_up', label:labelOf(ev), rel, srcKind, raw:ev}); }); };
+  for(const f of (dp.species||[])){ const j=await readJ(f.rel); if(!j) continue; const sp=norm(j.name||f.name.replace(/\.json$/,'')); addNode(sp,true); pushEdges(sp,f.rel,'species',j.evolutions,null); (j.forms||[]).forEach((fm,fi)=>pushEdges(sp,f.rel,'species',fm.evolutions,fi)); }
+  for(const f of (dp.additions||[])){ const j=await readJ(f.rel); if(!j) continue; const sp=norm((j.target||'').split(':').pop()); if(!sp) continue; addNode(sp,false); pushEdges(sp,f.rel,'addition',j.evolutions,null); (j.forms||[]).forEach((fm,fi)=>pushEdges(sp,f.rel,'addition',fm.evolutions,fi));
+    const pe=j.preEvolution; const pre=typeof pe==='string'?norm(pe):(pe&&typeof pe.name==='string'?norm(pe.name):(pe&&typeof pe.species==='string'?norm(pe.species):null));   // solo string válido (evita nodo '[object Object]')
+    if(pre){ addNode(pre,false); GRAPH.edges.push({id:'pre_'+slug(pre+'_'+sp), from:pre, to:sp, variant:'pre', label:'preevolución', rel:f.rel, srcKind:'addition', pre:true}); } }
+  // dedupe (ids únicos → no colapsa aristas legítimas)
+  const seen=new Set(); GRAPH.edges=GRAPH.edges.filter(e=>{ const k=e.id+'|'+e.from+'|'+e.to; if(seen.has(k)) return false; seen.add(k); return true; });
+  return true; }
+
+// ===== layout BFS + render del grafo =====
+function neighbors(sp){ const outs=GRAPH.edges.filter(e=>e.from===sp&&!e.pre); const ins=GRAPH.edges.filter(e=>e.to===sp); return {outs,ins}; }
+function render(){ const cv=$('canvas'); if(!PROJECT||!PROJECT.root){ cv.innerHTML='<div class="ev-empty"><div class="card"><h2>Sin pack</h2><p>No hay ningún pack abierto. Abre o crea uno desde el Inicio.</p></div></div>'; return; }
+  if(!focusSp){ const pack=[...GRAPH.nodes.values()].filter(n=>n.inPack).map(n=>n.sp).sort();
+    const body = pack.length
+      ? '<p>Elige un Pokémon de tu pack (o búscalo arriba) para ver y editar su cadena de evolución.</p><div class="ev-chips">'+pack.map(sp=>'<button class="ev-chip" data-sp="'+esc(sp)+'">'+esc(cap(sp))+'</button>').join('')+'</div>'
+      : '<p>Busca cualquier Pokémon arriba y pulsa ➕ para crear su evolución.</p>';
+    cv.innerHTML='<div class="ev-empty"><div class="card" style="max-width:540px"><div class="pic"><span class="qm">🔀</span></div><h2>Cadenas de evolución</h2>'+body+'</div></div>';
+    cv.querySelectorAll('.ev-chip').forEach(b=>b.onclick=()=>setFocus(b.dataset.sp)); return; }
+  const node=GRAPH.nodes.get(focusSp)||{sp:focusSp,inPack:false,dex:DEX.get(focusSp)};
+  $('vanillaBanner').style.display = node.inPack? 'none':'flex';
+  // columnas: pre (col -1), foco (0), evos (1), evos-de-evos (2)
+  const cols={'-1':[],0:[focusSp],1:[],2:[]}; const placed=new Set([focusSp]);   // un nodo NO puede aparecer en dos columnas
+  const pres=GRAPH.edges.filter(e=>e.to===focusSp); pres.forEach(e=>{ if(!placed.has(e.from)){ cols['-1'].push(e.from); placed.add(e.from); } });
+  const outs1=GRAPH.edges.filter(e=>e.from===focusSp&&!e.pre); outs1.forEach(e=>{ if(!placed.has(e.to)){ cols[1].push(e.to); placed.add(e.to); } });
+  cols[1].forEach(sp=>{ GRAPH.edges.filter(e=>e.from===sp&&!e.pre).forEach(e=>{ if(!placed.has(e.to)){ cols[2].push(e.to); placed.add(e.to); } }); });
+  colOf=new Map(); [['-1',cols['-1']],[0,cols[0]],[1,cols[1]],[2,cols[2]]].forEach(([c,arr])=>arr.forEach(sp=>colOf.set(sp,Number(c))));   // para que drawEdges solo conecte columnas contiguas
+  const order=['-1',0,1,2].filter(c=>cols[c].length);
+  if(!pres.length && !outs1.length){
+    const dx=node.dex!=null?(' · Nº '+node.dex):'';
+    cv.innerHTML='<div class="ev-empty"><div class="card"><div class="pic" data-sp="'+esc(focusSp)+'"><span class="ld"></span></div><h2>'+esc(cap(focusSp))+'</h2><p>'+(node.inPack?'Este Pokémon aún no tiene evoluciones en tu pack.':'No se conocen sus evoluciones base; añade la primera para tu pack.')+dx+'</p><button class="btn primary" onclick="openForm(\''+esc(focusSp)+'\')">➕ Crear su primera evolución</button></div></div>';
+    fillStills(); return; }
+  let html='<svg class="ev-edges" id="edges"></svg>';
+  for(const c of order){ html+='<div class="ev-col" data-col="'+c+'">'+cols[c].map(sp=>nodeHtml(sp)).join('')+'</div>'; }
+  cv.innerHTML=html;
+  cv.querySelectorAll('.ev-node').forEach(el=>{ el.style.cursor='pointer'; el.onclick=ev=>{ if(ev.target.closest('.addb')) return; if(el.dataset.sp!==focusSp) setFocus(el.dataset.sp); }; });   // clic en nodo = centrar la cadena ahí
+  requestAnimationFrame(()=>{ drawEdges(); fillStills(); }); }
+function nodeHtml(sp){ const n=GRAPH.nodes.get(sp)||{sp,inPack:false,dex:DEX.get(sp)}; const dx=n.dex!=null?('Nº '+n.dex):''; const tag=n.inPack?'<span class="chip pack">en tu pack</span>':'<span class="chip">vanilla</span>';
+  return '<div class="ev-node'+(sp===focusSp?' focus':'')+(n.inPack?'':' ghost')+'" data-sp="'+esc(sp)+'">'+
+    '<button class="addb" title="Añadir una evolución desde aquí" onclick="event.stopPropagation();openForm(\''+esc(sp)+'\')">+</button>'+
+    '<div class="pic" data-sp="'+esc(sp)+'"><span class="ld"></span></div>'+
+    '<div class="nm">'+esc(cap(sp))+'</div>'+
+    '<div class="meta">'+(dx?'<span>'+dx+'</span>':'')+tag+'</div>'+
+    '</div>'; }
+function centerOf(el,host){ const r=el.getBoundingClientRect(),h=host.getBoundingClientRect(); return {x:r.left-h.left+r.width/2, y:r.top-h.top+r.height/2, w:r.width, h:r.height}; }
+function drawEdges(){ const host=$('canvas'), svg=$('edges'); if(!host||!svg) return; const W=host.scrollWidth,H=host.scrollHeight; svg.setAttribute('width',W); svg.setAttribute('height',H); svg.style.width=W+'px'; svg.style.height=H+'px';
+  document.querySelectorAll('.ev-lbl').forEach(l=>l.remove()); let paths='';
+  const nodeEl=sp=>host.querySelector('.ev-node[data-sp="'+CSS.escape(sp)+'"]');
+  const visible=GRAPH.edges.filter(e=>{ const a=nodeEl(e.from),b=nodeEl(e.to); return a&&b&&colOf.get(e.from)!=null&&colOf.get(e.to)===colOf.get(e.from)+1&&!(e.pre&&GRAPH.edges.some(x=>!x.pre&&x.from===e.from&&x.to===e.to)); });   // solo columnas contiguas (sin flechas hacia atrás/cruzadas)
+  for(const e of visible){ const a=nodeEl(e.from),b=nodeEl(e.to); const ca=centerOf(a,host),cb=centerOf(b,host); const x1=ca.x+ca.w/2, y1=ca.y, x2=cb.x-cb.w/2, y2=cb.y; const mx=(x1+x2)/2;
+    paths+='<path d="M'+x1+' '+y1+' C '+mx+' '+y1+' '+mx+' '+y2+' '+x2+' '+y2+'" fill="none" stroke="var(--line2)" stroke-width="2"/>';
+    paths+='<path d="M'+x2+' '+y2+' l -8 -5 l 0 10 z" fill="var(--line2)"/>';
+    const lbl=document.createElement('div'); lbl.className='ev-lbl'; lbl.style.left=mx+'px'; lbl.style.top=((y1+y2)/2)+'px';
+    const eid=e.id;
+    lbl.innerHTML='<span class="t" title="Editar esta evolución">'+esc(e.label)+'</span>'+(e.pre?'':'<button class="play" title="Ver animación de evolución">▶</button><button class="del" title="Quitar">✕</button>');
+    const t=lbl.querySelector('.t'); if(t&&!e.pre) t.onclick=()=>editEdge(eid);
+    const pb=lbl.querySelector('.play'); if(pb) pb.onclick=()=>openEvoPlay(e.from,e.to);
+    const db=lbl.querySelector('.del'); if(db) db.onclick=()=>removeEdge(eid);
+    host.appendChild(lbl); }
+  svg.innerHTML=paths; }
+
+// ===== buscador de raíz =====
+function rootCandidates(q){ q=norm(q); const inPack=[...GRAPH.nodes.values()].filter(n=>n.inPack).map(n=>n.sp); const all=new Set(inPack); CAT.forEach(m=>all.add(norm(m.name)));
+  let list=[...all]; if(q) list=list.filter(s=>s.includes(q)); list.sort((a,b)=>{ const pa=GRAPH.nodes.get(a)&&GRAPH.nodes.get(a).inPack?0:1, pb=GRAPH.nodes.get(b)&&GRAPH.nodes.get(b).inPack?0:1; if(pa!==pb) return pa-pb; return a.localeCompare(b); }); return list.slice(0,400); }
+function onSearch(){ const q=$('rootSearch').value; const pick=$('rootPick'); const list=rootCandidates(q); if(!list.length){ pick.classList.remove('open'); pick.innerHTML=''; return; }
+  pick.innerHTML=list.map(sp=>{ const n=GRAPH.nodes.get(sp); const dx=DEX.has(sp)?('Nº '+DEX.get(sp)):''; const tag=n&&n.inPack?'<span class="tag">pack</span>':''; return '<div class="pk" data-sp="'+esc(sp)+'">'+esc(cap(sp))+' '+tag+'<span class="dx">'+dx+'</span></div>'; }).join('');
+  pick.querySelectorAll('.pk').forEach(el=>el.onclick=()=>{ setFocus(el.dataset.sp); }); pick.classList.add('open'); }
+document.addEventListener('click',e=>{ if(!e.target.closest('.ev-search')){ document.querySelectorAll('.ev-pick').forEach(p=>p.classList.remove('open')); } });
+function setFocus(sp){ focusSp=norm(sp); $('rootSearch').value=cap(focusSp); $('rootPick').classList.remove('open'); render(); }
+
+// ===== formulario añadir / editar =====
+let formFrom=null, formEditId=null, formEditRel=null, formEditIdx=null, formEditFormIdx=null;
+function pickKind(k){ document.querySelectorAll('#fKind .btn').forEach(b=>b.classList.toggle('on',b.dataset.k===k)); $('fLevelBox').style.display=k==='level'?'':'none'; $('fItemBox').style.display=k==='stone'?'':'none'; $('fAmountBox').style.display=k==='friendship'?'':'none'; }
+function curKind(){ const b=document.querySelector('#fKind .btn.on'); return b?b.dataset.k:'level'; }
+function openForm(fromSp, editEv, editRel, editIdx, editFormIdx){ formFrom=norm(fromSp); formEditId=(editEv&&editEv.id)?editEv.id:null; formEditRel=(editEv&&editRel)||null; formEditIdx=(editEv&&editIdx!=null)?editIdx:null; formEditFormIdx=(editEv&&editFormIdx!=null)?editFormIdx:null; $('formTitle').firstChild.textContent=editEv?'Editar evolución ':'Nueva evolución '; $('formFrom').textContent=cap(formFrom);
+  // defaults o valores del que se edita
+  const ev=editEv||null; let kind='level';
+  $('fResult').value=ev?cap(norm(ev.result)):''; $('fResultPick').classList.remove('open'); $('fLevel').value=16; $('fItem').value='cobblemon:fire_stone'; $('fAmount').value=160; $('fConsume').checked=false; $('fConds').innerHTML=''; formRawReqs=[]; $('fPreevo').checked=!editEv;
+  if(ev){ const reqs=ev.requirements||[]; if(ev.variant==='item_interact'){ kind='stone'; $('fItem').value=ev.requiredContext||'cobblemon:fire_stone'; $('fConsume').checked=!!ev.consumeHeldItem; }
+    else if(ev.variant==='trade'){ kind='trade'; }
+    else { const fr=reqs.find(r=>r&&r.variant==='friendship'); const lv=reqs.find(r=>r&&r.variant==='level'); if(fr){ kind='friendship'; $('fAmount').value=fr.amount!=null?fr.amount:160; } else if(lv){ kind='level'; $('fLevel').value=lv.minLevel!=null?lv.minLevel:16; } }
+    const known=COND_TYPES.map(c=>c.v); const mainKey = kind==='level'?'level':(kind==='friendship'?'friendship':null); let usedMain=false;
+    reqs.forEach(r=>{ if(!r||!r.variant) return; if(!usedMain&&r.variant===mainKey){ usedMain=true; return; } const d=COND_TYPES.find(c=>c.v===r.variant); if(d){ addCond({variant:r.variant, val:r[d.key], val2:d.extraNum?r[d.extraNum]:undefined}); } else formRawReqs.push(r); });
+    if(reqs.length>(mainKey?1:0)) $('fCondWrap').open=true; }
+  pickKind(kind); $('formOv').classList.add('open'); setTimeout(()=>$('fResult').focus(),40); }
+function closeForm(){ $('formOv').classList.remove('open'); formFrom=null; formEditId=null; formEditRel=null; formEditIdx=null; formEditFormIdx=null; }
+function editEdge(id){ const e=GRAPH.edges.find(x=>x.id===id); if(!e){ toast('No encontré esa evolución','err'); return; } openForm(e.from, e.raw||{variant:e.variant,result:e.to,requirements:[]}, e.rel, e.idx, e.formIdx); }
+// selector del Pokémon resultado (lista completa: pack + catálogo vanilla)
+function fResultSearch(){ const q=$('fResult').value; const pick=$('fResultPick'); const list=rootCandidates(q).slice(0,300); if(!list.length){ pick.classList.remove('open'); pick.innerHTML=''; return; }
+  pick.innerHTML=list.map(sp=>{ const n=GRAPH.nodes.get(sp); const tag=n&&n.inPack?'<span class="tag">pack</span>':''; const dx=DEX.has(sp)?('<span class="dx">Nº '+DEX.get(sp)+'</span>'):''; return '<div class="pk" data-sp="'+esc(sp)+'">'+esc(cap(sp))+' '+tag+dx+'</div>'; }).join('');
+  pick.querySelectorAll('.pk').forEach(el=>el.onclick=()=>{ $('fResult').value=cap(el.dataset.sp); pick.classList.remove('open'); });
+  const rb=$('fResult').getBoundingClientRect(); pick.style.position='fixed'; pick.style.left=rb.left+'px'; pick.style.top=(rb.bottom+4)+'px'; pick.style.width=rb.width+'px';   // flota por encima (el modal tiene overflow y lo recortaría)
+  pick.classList.add('open'); }
+// constructor de condiciones (todas las soportadas por Cobblemon que generamos de forma amigable)
+const COND_TYPES=[
+ {v:'level', label:'Nivel mínimo', kind:'num', key:'minLevel', def:1},
+ {v:'time_range', label:'Momento del día', kind:'sel', key:'range', opts:[['day','Día'],['night','Noche'],['dusk','Atardecer'],['dawn','Amanecer']]},
+ {v:'biome', label:'Bioma (etiqueta o id)', kind:'txt', key:'biomeCondition', ph:'#cobblemon:is_cold'},
+ {v:'moon_phase', label:'Fase lunar', kind:'sel', num:true, key:'moonPhase', opts:[[0,'Luna llena (0)'],[1,'1'],[2,'Cuarto menguante (2)'],[3,'3'],[4,'Luna nueva (4)'],[5,'5'],[6,'Cuarto creciente (6)'],[7,'7']]},
+ {v:'held_item', label:'Lleva un objeto en mano', kind:'txt', key:'itemCondition', ph:'cobblemon:kings_rock'},
+ {v:'has_move', label:'Sabe un movimiento', kind:'txt', key:'move', ph:'ancient_power'},
+ {v:'has_move_type', label:'Sabe un movimiento de tipo', kind:'txt', key:'type', ph:'water'},
+ {v:'party_member', label:'Lleva un Pokémon en el equipo', kind:'txt', key:'target', ph:'cobblemon:remoraid'},
+ {v:'world', label:'En un mundo/dimensión', kind:'txt', key:'identifier', ph:'minecraft:the_nether'},
+ {v:'structure', label:'Cerca de una estructura', kind:'txt', key:'structure', ph:'minecraft:village'},
+ {v:'battle_critical_hits', label:'Golpes críticos en combate', kind:'num', key:'amount', def:1},
+ {v:'damage_taken', label:'Daño recibido (acumulado)', kind:'num', key:'amount', def:49},
+ {v:'use_move', label:'Usó un movimiento N veces', kind:'txt', key:'move', ph:'rollout', extraNum:'amount'},
+ {v:'defeat', label:'Derrotó a N de una especie', kind:'txt', key:'target', ph:'cobblemon:bidoof', extraNum:'amount'},
+];
+function condDef(v){ return COND_TYPES.find(c=>c.v===v)||COND_TYPES[0]; }
+let formRawReqs=[];
+function addCond(pre){ const host=$('fConds'); const row=document.createElement('div'); row.className='ev-cond'; row.style.cssText='display:flex;gap:6px;align-items:center;margin-top:6px';
+  const sel=document.createElement('select'); sel.style.flex='0 0 44%'; sel.innerHTML=COND_TYPES.map(c=>'<option value="'+c.v+'">'+c.label+'</option>').join('');
+  const val=document.createElement('div'); val.style.cssText='flex:1;display:flex;gap:4px';
+  const del=document.createElement('button'); del.className='btn small del'; del.type='button'; del.textContent='✕'; del.title='Quitar condición'; del.onclick=()=>row.remove();
+  row.appendChild(sel); row.appendChild(val); row.appendChild(del); host.appendChild(row);
+  const renderVal=(v0,v1)=>{ const d=condDef(sel.value); let h=''; if(d.kind==='sel'){ h='<select style="width:100%">'+d.opts.map(o=>'<option value="'+o[0]+'">'+esc(o[1])+'</option>').join('')+'</select>'; } else if(d.kind==='num'){ h='<input type="number" style="width:100%" value="'+(d.def||1)+'">'; } else { h='<input type="text" style="width:100%" placeholder="'+esc(d.ph||'')+'">'; } if(d.extraNum) h+='<input type="number" style="width:64px" title="cantidad" value="1">'; val.innerHTML=h; const ins=val.querySelectorAll('input,select'); if(v0!=null&&ins[0]) ins[0].value=v0; if(v1!=null&&ins[1]) ins[1].value=v1; };
+  sel.onchange=()=>renderVal(); if(pre){ sel.value=pre.variant; renderVal(pre.val, pre.val2); } else renderVal(); }
+function collectConds(){ const out=[]; document.querySelectorAll('#fConds .ev-cond').forEach(row=>{ const v=row.querySelector('select').value; const d=condDef(v); const ins=row.children[1].querySelectorAll('input,select'); if(!ins.length) return; let raw=ins[0].value; const isNum=(d.kind==='num'||d.num);
+  let val=isNum?(Number.isFinite(parseInt(raw))?parseInt(raw):(d.def!=null?d.def:1)):String(raw).trim();
+  if(!isNum&&!val) return;   // condición de texto vacía → se ignora
+  if(v==='held_item'&&val) val=nsHeldItem(val);
+  const o={variant:v}; o[d.key]=val; if(d.extraNum&&ins[1]) o[d.extraNum]=parseInt(ins[1].value)||1; out.push(o); }); return out; }
+function buildEvo(from){ const result=norm($('fResult').value); if(!result) return null; const kind=curKind();
+  const ev={ id:formEditId||(slug(from+'_'+result.replace(/\s+/g,'_'))), variant:'level_up', result, consumeHeldItem:false, learnableMoves:[], requirements:[] };
+  if(kind==='stone'){ ev.variant='item_interact'; ev.requiredContext=nsItem($('fItem').value||'cobblemon:fire_stone'); ev.consumeHeldItem=$('fConsume').checked; }
+  else if(kind==='trade'){ ev.variant='trade'; }
+  else if(kind==='friendship'){ ev.requirements.push({variant:'friendship', amount:parseInt($('fAmount').value)||160}); }
+  else { ev.requirements.push({variant:'level', minLevel:parseInt($('fLevel').value)||16}); }
+  collectConds().forEach(c=>ev.requirements.push(c));
+  (formRawReqs||[]).forEach(c=>ev.requirements.push(c));   // conserva variantes que no entendemos (no se pierden al editar)
+  return ev; }
+async function writeJson(rel,obj){ return fetch('/api/writefile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:PROJECT.root,rel,text:JSON.stringify(obj,null,2)+'\n'})}).then(r=>r.json()).catch(e=>({error:e.message})); }
+function speciesRelOf(sp){ const f=(lastFiles.species||[]).find(rel=>norm(rel.split('/').pop().replace(/\.json$/,''))===sp); return f||null; }
+function additionRelWith(sp){ // addition existente cuyo target apunte a sp y tenga evolutions (ya en GRAPH como rel de una arista)
+  const e=GRAPH.edges.find(x=>x.from===sp&&x.srcKind==='addition'&&x.rel); return e?e.rel:null; }
+async function saveEvo(){ if(!formFrom) return; const from=formFrom; const ev=buildEvo(from); if(!ev){ toast('Escribe el Pokémon resultado','err'); return; }
+  const btn=$('fSave'); btn.disabled=true;
+  try{
+    const speciesRel=speciesRelOf(from);
+    const rel = formEditRel || speciesRel || additionRelWith(from) || ('data/cobblemon/species_additions/'+from+'_evo.json');   // EDITAR siempre en el archivo donde vive la evo
+    const isSpecies = (rel===speciesRel);
+    let j=null; try{ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel}); j=r&&r.text?JSON.parse(r.text):null; }catch(e){}
+    if(!j){ if(isSpecies){ toast('No pude leer el species de origen','err'); btn.disabled=false; return; } j={target:'cobblemon:'+from, evolutions:[]}; }
+    let arr;
+    if(formEditFormIdx!=null && Array.isArray(j.forms) && j.forms[formEditFormIdx]){ const fm=j.forms[formEditFormIdx]; fm.evolutions=Array.isArray(fm.evolutions)?fm.evolutions:[]; arr=fm.evolutions; }
+    else { j.evolutions=Array.isArray(j.evolutions)?j.evolutions:[]; arr=j.evolutions; }
+    let i=-1;
+    if(formEditIdx!=null && arr[formEditIdx]) i=formEditIdx;                  // reemplazar EN SU SITIO (aunque el disco no tuviera id)
+    else if(ev.id) i=arr.findIndex(x=>x&&x.id===ev.id);
+    if(i>=0){ if(!ev.id && arr[i].id) ev.id=arr[i].id; arr[i]=ev; } else arr.push(ev);
+    const w=await writeJson(rel,j); if(w&&w.error){ toast('Error: '+w.error,'err'); btn.disabled=false; return; }
+    if($('fPreevo').checked && !formEditId && !formEditRel){ await writePreEvo(norm(ev.result), from); }   // solo al CREAR
+    toast('Evolución guardada ✓','ok'); closeForm(); await reload(); setFocus(from);
+  }catch(e){ toast('Error: '+e.message,'err'); } btn.disabled=false; }
+async function writePreEvo(resultSp, fromSp){ const speciesRel=speciesRelOf(resultSp);
+  if(speciesRel){ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel:speciesRel}); const j=r&&r.text?JSON.parse(r.text):null; if(j){ j.preEvolution=fromSp; await writeJson(speciesRel,j); } return; }
+  let rel=null; const ed=GRAPH.edges.find(x=>x.to===resultSp&&x.srcKind==='addition'&&x.rel); rel=ed?ed.rel:('data/cobblemon/species_additions/'+resultSp+'_preevo.json'); let j=null; const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel}).catch(()=>null); j=r&&r.text?JSON.parse(r.text):{target:'cobblemon:'+resultSp}; j.preEvolution=fromSp; await writeJson(rel,j); }
+function evMatch(x,e){ if(!x) return false; if(x.id&&e.hasId) return x.id===e.raw.id&&norm(x.result)===e.to; return norm(x.result)===e.to&&(x.variant||'level_up')===(e.variant||'level_up')&&JSON.stringify(x.requirements||[])===JSON.stringify((e.raw&&e.raw.requirements)||[]); }
+function rmEvo(arr,e,useIdx){ if(!Array.isArray(arr)) return arr; if(useIdx!=null&&arr[useIdx]&&evMatch(arr[useIdx],e)) return arr.filter((_,k)=>k!==useIdx); return arr.filter(x=>!evMatch(x,e)); }   // por índice si encaja, si no por contenido
+async function removeEdge(id){ const e=GRAPH.edges.find(x=>x.id===id); if(!e||!e.rel) return; if(!confirm('¿Quitar la evolución '+cap(e.from)+' → '+cap(e.to)+'?')) return;
+  try{ const r=await csInvoke('read_pack_file',{path:PROJECT.root,rel:e.rel}); const j=r&&r.text?JSON.parse(r.text):null; if(!j){ toast('No pude leer el archivo','err'); return; }
+    if(e.formIdx!=null && Array.isArray(j.forms) && j.forms[e.formIdx]){ j.forms[e.formIdx].evolutions=rmEvo(j.forms[e.formIdx].evolutions, e, e.idx); }
+    else { j.evolutions=rmEvo(j.evolutions, e, (e.formIdx==null?e.idx:null)); }
+    const w=await writeJson(e.rel,j); if(w&&w.error){ toast('Error: '+w.error,'err'); return; }
+    const stillEvolves=GRAPH.edges.some(x=>!x.pre&&x.from===e.from&&x.to===e.to&&x.id!==id);   // limpiar la preevolución recíproca si ya no evoluciona ahí
+    if(!stillEvolves){ const resRel=speciesRelOf(e.to)||((GRAPH.edges.find(x=>x.to===e.to&&x.pre&&x.rel)||{}).rel); if(resRel){ try{ const rr=await csInvoke('read_pack_file',{path:PROJECT.root,rel:resRel}); const jr=rr&&rr.text?JSON.parse(rr.text):null; if(jr&&norm(jr.preEvolution)===e.from){ delete jr.preEvolution; await writeJson(resRel,jr); } }catch(_){ } } }
+    toast('Evolución quitada ✓','ok'); await reload(); setFocus(e.from);
+  }catch(err){ toast('Error: '+err.message,'err'); } }
+
+// ===== visor de evolución (animación 3D) =====
+let pRenderer=null,pScene=null,pCam=null,pRaf=null,curGrp=null,curClip=null,fromObj=null,toObj=null,baseScale=1,playing=false,animStart=0,playReq=0;
+function playLoop(){ pRaf=requestAnimationFrame(playLoop); const st=$('evoStage'); if(st&&pRenderer){ const w=st.clientWidth||400,h=st.clientHeight||300; const cv2=pRenderer.domElement; if(cv2.width!==w||cv2.height!==h){ pRenderer.setSize(w,h,false); pCam.aspect=w/h; pCam.updateProjectionMatrix(); } }
+  if(curGrp){ if(curClip&&window.applyAnimClip){ try{ window.applyAnimClip(curGrp,curClip,((performance.now()-animStart)/1000)%(curClip.length||1)); }catch(e){} } curGrp.rotation.y+=0.006; }   // idle viva + giro lento
+  if(pRenderer) pRenderer.render(pScene,pCam); }
+function ensurePlay(){ if(!pRenderer){ const cv=$('evoCanvas'); pRenderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true}); pRenderer.setClearColor(0x000000,0); pRenderer.setPixelRatio(Math.min(devicePixelRatio,2)); pScene=new THREE.Scene(); pScene.add(new THREE.AmbientLight(0xffffff,0.95)); const d=new THREE.DirectionalLight(0xffffff,0.9); d.position.set(40,60,50); pScene.add(d); const d2=new THREE.DirectionalLight(0xbcd2ff,0.4); d2.position.set(-40,10,-30); pScene.add(d2); pCam=new THREE.PerspectiveCamera(34,1,0.1,5000); pCam.position.set(0,8,40); animStart=performance.now(); }
+  if(pRaf==null) playLoop(); }   // (re)arranca el bucle solo si estaba parado
+async function loadObj(name){ const m=await getModel(name); if(!m) return null; const img=await loadImg(m.texUrl); const grp=window.geoToThreeGroup(m.geo, texFromImg(img)); return {grp, clip:idleClipFor(m)}; }
+function setCurrent(obj){ const grp=obj&&obj.grp; if(curGrp&&curGrp!==grp) pScene.remove(curGrp); curGrp=grp||null; curClip=obj?obj.clip:null; if(grp&&!grp.parent) pScene.add(grp); if(grp){ faceCamera(grp); frame34(grp,pCam,1.0); baseScale=grp.scale.x||1; } }
+async function openEvoPlay(fromSp,toSp){ fromSp=norm(fromSp); toSp=norm(toSp); const my=++playReq; $('evoFromN').textContent=cap(fromSp); $('evoToN').textContent=cap(toSp); $('playOv').classList.add('open'); ensurePlay(); playing=false; $('evoFlash').style.opacity=0; $('evoStage').style.transform=''; $('evoPlayBtn').disabled=true; $('evoPlayBtn').textContent='Cargando…';
+  if(curGrp){ pScene.remove(curGrp); curGrp=null; curClip=null; } fromObj=toObj=null;
+  const fo=await loadObj(fromSp); if(my!==playReq) return; const to=await loadObj(toSp); if(my!==playReq) return; fromObj=fo; toObj=to;
+  if(!fromObj&&!toObj){ $('evoPlayBtn').textContent='Sin modelo 3D'; toast('No tengo modelo 3D de estos Pokémon','info'); return; }
+  animStart=performance.now(); setCurrent(fromObj||toObj); $('evoPlayBtn').disabled=false; $('evoPlayBtn').textContent='▶ Evolucionar'; }
+function closeEvoPlay(){ $('playOv').classList.remove('open'); if(pRaf){ cancelAnimationFrame(pRaf); pRaf=null; } playReq++; }   // parar el bucle (no quemar GPU con el modal cerrado)
+function playEvolution(){ if(playing) return; if(!toObj){ toast('No tengo el modelo del resultado','info'); return; } playing=true; $('evoPlayBtn').disabled=true;
+  const flash=$('evoFlash'), stage=$('evoStage'); const t0=performance.now(), DUR=2400; let swapped=false; if(!curGrp) setCurrent(fromObj||toObj);
+  function step(now){ const t=Math.min(1,(now-t0)/DUR);
+    const sh=Math.sin(now/35)*(1.5+t*9); stage.style.transform='translateX('+sh.toFixed(1)+'px)';
+    flash.style.opacity = (t<0.5 ? (t/0.5) : (1-(t-0.5)/0.5)) * 0.96;
+    if(!swapped && t>=0.5){ swapped=true; setCurrent(toObj); }
+    if(curGrp){ const sc=1+Math.sin(t*Math.PI)*0.14; curGrp.scale.setScalar((baseScale||1)*sc); }
+    if(t<1){ requestAnimationFrame(step); } else { flash.style.opacity=0; stage.style.transform=''; if(curGrp) curGrp.scale.setScalar(baseScale||1); playing=false; $('evoPlayBtn').disabled=false; $('evoPlayBtn').textContent='↻ Repetir'; } }
+  requestAnimationFrame(step); }
+
+// ===== puente / arranque =====
+window.csEvosFocus=function(sp){ if(sp) setFocus(sp); };
+async function reload(){ const ok=await scan(); render(); return ok; }
+(async function init(){ await loadCatalog(); if(PROJECT&&PROJECT.root){ await scan(); } let f=null; try{ f=localStorage.getItem('cs_evos_focus'); if(f) localStorage.removeItem('cs_evos_focus'); }catch(e){} if(f){ setFocus(f); } else render(); })();
+</script>
+</body></html>

@@ -12,6 +12,7 @@
 <script src="/geo-three-reference.js"></script>
 <script src="/anim-bedrock.js"></script>
 <script src="/vendor/gif-encoder.js"></script>
+<script src="/vendor/apng-encoder.js"></script>
 <script src="/ctxmenu.js"></script>
 <style>
   .ph{display:grid;grid-template-columns:248px 1fr 296px;grid-template-rows:minmax(0,1fr);height:100vh;overflow:hidden}
@@ -320,6 +321,8 @@
             <div class="sec-h">Duración</div>
             <label class="pl">Duración del vídeo/GIF</label>
             <div class="sline"><input type="range" id="recSecs" min="1" max="20" value="4" oninput="$('rsV').textContent=this.value+'s'"><span class="sv" id="rsV">4s</span></div>
+            <label class="pl">Fluidez del GIF (fps) <span class="muted" style="font-weight:400">— más fps = más frames y más suave</span></label>
+            <select id="gifFps" style="width:100%"><option value="12">12 fps (ligero)</option><option value="18" selected>18 fps (recomendado)</option><option value="24">24 fps (suave)</option><option value="30">30 fps (muy suave · pesado)</option></select>
             <label class="row2" style="font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="recTurn" checked> Giro 360°</label>
             <label class="pl">Qué gira</label>
             <select id="spinMode" style="width:100%"><option value="camera">La cámara (orbita)</option><option value="model">El modelo</option></select>
@@ -467,7 +470,8 @@ function applyPose(a){ if(!a.pose||!a.bones) return; const anim=(a.clip&&a.clip.
   if(anim&&anim[bn]){ g.rotation.x+=P[0]*DEG; g.rotation.y+=P[1]*DEG; g.rotation.z+=P[2]*DEG; }   // el clip ya puso reposo+anim este frame → sumamos pose encima
   else { g.rotation.set(r.rx+P[0]*DEG, r.ry+P[1]*DEG, r.rz+P[2]*DEG); } } }                       // sin animar este frame → absoluta (idempotente, no se acumula)
 let recording=false, turntable=false, recStart=0, recDur=4000, mediaRec=null, recCamPos=null, recCamTgt=null;
-function loop(){ requestAnimationFrame(loop); resize3(); const now=performance.now();
+let capturing=false;   // exportGIF/contactSheet: el render lo hace el exportador; loop() NO debe pisar cámara/stage (ni mover por inercia) entre frames
+function loop(){ requestAnimationFrame(loop); if(capturing) return; resize3(); const now=performance.now();
   if(tc.object&&tc.object.parent===null) tc.detach();   // blindaje: nunca apuntar a un group fuera del grafo
   for(const a of actors){ if(a.clip&&window.applyAnimClip){ const t=a.animOn?((now-a.animStart)/1000):(a.frameT||0); window.applyAnimClip(a.model,a.clip,t); } applyPose(a);
     if(!(gizmoDragging&&tc.object===a.group)) applyTransform(a); }   // durante el arrastre del gizmo, él manda (no pelear por el frame)
@@ -725,7 +729,7 @@ async function contactSheet(){ if(!actors.length){ toast('Añade al menos un Pok
   let picked=[...document.querySelectorAll('#csAngles .btn.on')].map(b=>b.dataset.ang); if(!picked.length) picked=['front','34','side','back'];
   const angles=picked.map(k=>[k,ANGLE_LABELS[k]||k]); const cell=512, cols=angles.length<=1?1:(angles.length<=4?2:3), rows=Math.ceil(angles.length/cols), W=cell*cols, H=cell*rows;
   const savePos=camera.position.clone(), saveTgt=controls.target.clone(), savePR=renderer.getPixelRatio(), savedRot=stage.rotation.y, cw=canvas.clientWidth||640, ch=canvas.clientHeight||480;
-  recording=true; tc.visible=false; renderer.setPixelRatio(1); renderer.setSize(cell,cell,false); updateCamAspect(1);   // ocultar gizmo ANTES del primer render síncrono (el invariante del loop solo actúa en el siguiente tick)
+  recording=true; capturing=true; tc.visible=false; renderer.setPixelRatio(1); renderer.setSize(cell,cell,false); updateCamAspect(1);   // ocultar gizmo + congelar loop() durante la captura
   const out=document.createElement('canvas'); out.width=W; out.height=H; const g=out.getContext('2d'); g.fillStyle='#15171c'; g.fillRect(0,0,W,H);
   const tmp=document.createElement('canvas'); tmp.width=cell; tmp.height=cell; const tg=tmp.getContext('2d');
   try{
@@ -737,7 +741,7 @@ async function contactSheet(){ if(!actors.length){ toast('Añade al menos un Pok
     const ov=buildOverlay(W,H); if(ov) g.drawImage(ov,0,0);
     await saveExport((actors[0]?actors[0].name:'foto')+'_hoja.png', out.toDataURL('image/png').replace(/^data:[^,]+,/,''));
   }catch(e){ toast('Error en la hoja de contacto: '+e.message,'err'); }
-  finally{ recording=false; busyExport=false; renderer.setPixelRatio(savePR); camera.position.copy(savePos); controls.target.copy(saveTgt); controls.update(); stage.rotation.y=savedRot; renderer.setSize(cw,ch,false); updateCamAspect((cw||1)/(ch||1)); renderer.render(scene,camera); }
+  finally{ recording=false; capturing=false; busyExport=false; renderer.setPixelRatio(savePR); camera.position.copy(savePos); controls.target.copy(saveTgt); controls.update(); stage.rotation.y=savedRot; renderer.setSize(cw,ch,false); updateCamAspect((cw||1)/(ch||1)); renderer.render(scene,camera); }
 }
 function toggleRecord(){ if(recording){ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); return; }
   if(!actors.length){ toast('Añade al menos un Pokémon','err'); return; }
@@ -749,8 +753,10 @@ function toggleRecord(){ if(recording){ if(mediaRec&&mediaRec.state!=='inactive'
   turntable=$('recTurn').checked; recDur=secs*1000; recStart=performance.now();
   recCamPos=camera.position.clone(); recCamTgt=controls.target.clone();   // para restaurar la cámara al acabar
   if(turntable){ computeSpinPivot(); if(spinModeVal()==='camera'){ controls.target.copy(spinPivot); beginOrbit(); } else spinModelTo(spinStart); } else stage.rotation.y=spinStart;
+  const recMat=new Set(); for(const a of actors){ if(a.model) a.model.traverse(o=>{ if(o.isMesh&&o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m&&m.transparent){ recMat.add(m); m.transparent=false; m.depthWrite=true; m.needsUpdate=true; } }); } }); }   // render opaco durante la grabación (sin z-fighting al girar)
+  const recRestore=()=>{ recMat.forEach(m=>{ m.transparent=true; m.depthWrite=true; m.needsUpdate=true; }); };
   const chunks=[]; mediaRec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
-  mediaRec.onstop=()=>{ recording=false; turntable=false; orbitBase=null; stage.position.set(0,0,0); stage.rotation.set(0,0,0); if(recCamPos){ camera.position.copy(recCamPos); controls.target.copy(recCamTgt); controls.update(); }   // restaurar cámara y stage tras la órbita
+  mediaRec.onstop=()=>{ recording=false; turntable=false; orbitBase=null; recRestore(); stage.position.set(0,0,0); stage.rotation.set(0,0,0); if(recCamPos){ camera.position.copy(recCamPos); controls.target.copy(recCamTgt); controls.update(); }   // restaurar cámara y stage tras la órbita
     try{ stream.getTracks().forEach(t=>t.stop()); }catch(e){} $('recLbl').textContent='Grabar (WebM)'; $('recBtn').classList.remove('danger');
     const blob=new Blob(chunks,{type:'video/webm'}); blobToB64(blob).then(b64=>saveExport((actors[0]?actors[0].name:'foto')+'.webm', b64)); };
   recording=true; tc.visible=false; renderer.render(scene,camera);   // repintar sin gizmo ANTES de capturar el primer frame
@@ -758,7 +764,7 @@ function toggleRecord(){ if(recording){ if(mediaRec&&mediaRec.state!=='inactive'
     mediaRec.start(); $('recLbl').textContent='Detener'; $('recBtn').classList.add('danger');
     setTimeout(()=>{ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); }, recDur+60);
   }catch(e){   // si start() falla, revertir TODO el estado (si no, recording/turntable quedan pegados y bloquean la app)
-    recording=false; turntable=false; orbitBase=null; stage.position.set(0,0,0); stage.rotation.set(0,0,0);
+    recording=false; turntable=false; orbitBase=null; recRestore(); stage.position.set(0,0,0); stage.rotation.set(0,0,0);
     if(recCamPos){ camera.position.copy(recCamPos); controls.target.copy(recCamTgt); controls.update(); }
     try{ stream.getTracks().forEach(t=>t.stop()); }catch(_){ } mediaRec=null;
     $('recLbl').textContent='Grabar (WebM)'; $('recBtn').classList.remove('danger'); toast('No se pudo iniciar la grabación: '+e.message,'err');
@@ -780,29 +786,44 @@ async function exportGIF(seconds, turntable){
   if(!window.encodeGIF){ toast('Codificador GIF no disponible','err'); return; }
   if(!actors.length){ toast('Añade al menos un Pokémon','err'); return; }
   if(recording){ toast('Espera a que termine la captura en curso','info'); return; }
-  const fps=12, frames=Math.min(72, Math.max(2, Math.round((seconds||4)*fps)));
+  const fps=Math.max(6,Math.min(30, +($('gifFps')&&$('gifFps').value)||18)); const frames=Math.min(300, Math.max(2, Math.round((seconds||4)*fps)));
   const cw=canvas.clientWidth||640, ch=canvas.clientHeight||480, sc=Math.min(1, 420/Math.max(cw,ch));
   const w=Math.max(2,Math.round(cw*sc)), h=Math.max(2,Math.round(ch*sc));
   const btn=$('gifBtn'); if(btn){ btn.disabled=true; $('gifLbl').textContent='GIF…'; }
-  recording=true; tc.visible=false; const savedRot=stage.rotation.y, savedPR=renderer.getPixelRatio();   // ocultar gizmo antes del primer render síncrono
+  recording=true; capturing=true; tc.visible=false; const savedRot=stage.rotation.y, savedPR=renderer.getPixelRatio();   // ocultar gizmo + congelar loop() durante la captura
   const savePos=camera.position.clone(), saveTgt=controls.target.clone();   // restaurar cámara (modo órbita)
+  const _damp=controls.enableDamping; controls.enableDamping=false;   // sin inercia entre frames
   if(turntable){ computeSpinPivot(); if(spinModeVal()==='camera'){ controls.target.copy(spinPivot); beginOrbit(); } }
+  // FIX C: en órbita de cámara, mover el rig de luces CON la cámara → sombreado constante por frame (sin parpadeo de tonos)
+  const camRig=(turntable && spinModeVal()==='camera'); const Lsave=camRig?{k:key.position.clone(),f:fill.position.clone(),b:back.position.clone()}:null;
+  const rigToCamera=()=>{ if(!camRig) return; const cp=camera.position, ct=controls.target; const fwd=new THREE.Vector3().subVectors(ct,cp).normalize(); const rt=new THREE.Vector3().crossVectors(fwd,camera.up).normalize(); const up=new THREE.Vector3().crossVectors(rt,fwd).normalize(); const dist=cp.distanceTo(ct)||16;
+    key.position.copy(ct).addScaledVector(rt,dist*0.6).addScaledVector(up,dist*0.8).addScaledVector(fwd,-dist*0.5);
+    fill.position.copy(ct).addScaledVector(rt,-dist*0.9).addScaledVector(up,dist*0.2).addScaledVector(fwd,-dist*0.3);
+    back.position.copy(ct).addScaledVector(up,dist*0.7).addScaledVector(fwd,dist*0.9); };
   renderer.setPixelRatio(1); renderer.setSize(w,h,false); updateCamAspect(w/h);
   const cap=document.createElement('canvas'); cap.width=w; cap.height=h; const cx=cap.getContext('2d',{willReadFrequently:true});
   const transparent=(bgMode==='transparent'); const fr=[]; const ov=buildOverlay(w,h);
+  // frames crujientes: render OPACO (cutout por alphaTest) durante la captura → sin z-fighting de DoubleSide ni motas/cambios de tono al girar
+  const matOpaque=new Set(); for(const a of actors){ if(a.model) a.model.traverse(o=>{ if(o.isMesh&&o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m&&m.transparent){ matOpaque.add(m); m.transparent=false; m.depthWrite=true; m.needsUpdate=true; } }); } }); }
   try{
-    for(let i=0;i<frames;i++){ const t=i/fps;
-      for(const a of actors){ if(a.clip&&window.applyAnimClip) window.applyAnimClip(a.model,a.clip, a.animOn? t : (a.frameT||0)); }
-      if(turntable) applyTurnFrame(i/frames);
+    for(let i=0;i<frames;i++){ const prog=i/frames;   // prog 0..(1-1/frames): nunca llega a 1 → el bucle no duplica el primer frame
+      for(const a of actors){ if(a.clip&&window.applyAnimClip){ let at;
+        if(a.animOn){ const L=a.clip.length||1; const cyc=Math.max(1,Math.round((seconds||4)/L)); at=prog*L*cyc; }   // ciclos ENTEROS del idle a lo largo del GIF → idle sin corte al reiniciar
+        else at=(a.frameT||0);
+        window.applyAnimClip(a.model,a.clip, at); } }
+      if(turntable) applyTurnFrame(prog);
+      rigToCamera();   // sombreado constante → sin parpadeo de tonos
       renderer.render(scene,camera);
-      cx.clearRect(0,0,w,h); cx.drawImage(canvas,0,0,w,h); if(ov) cx.drawImage(ov,0,0);
+      cx.clearRect(0,0,w,h); cx.drawImage(canvas,0,0,w,h);
+      if(transparent){ const im=cx.getImageData(0,0,w,h), aa=im.data; for(let k=3;k<aa.length;k+=4) aa[k]=aa[k]<128?0:255; cx.putImageData(im,0,0); }   // silueta dura 0/255 (sin rim de AA que "hierva" al girar)
+      if(ov) cx.drawImage(ov,0,0);
       fr.push(cx.getImageData(0,0,w,h));
       if((i&3)===0){ const gl=$('gifLbl'); if(gl) gl.textContent=Math.round((i+1)/frames*100)+'%'; await new Promise(r=>setTimeout(r,0)); }
     }
-    const bytes=window.encodeGIF(fr,w,h,Math.round(100/fps),{transparent,loop:0});
-    const b64=await blobToB64(new Blob([bytes])); await saveExport((actors[0]?actors[0].name:'foto')+'.gif', b64);
+    const base=(actors[0]?actors[0].name:'foto');
+    const bytes=window.encodeGIF(fr,w,h,Math.round(100/fps),{transparent,loop:0}); const b64=await blobToB64(new Blob([bytes])); await saveExport(base+'.gif', b64);
   }catch(e){ toast('Error al crear el GIF: '+e.message,'err'); }
-  finally{ stage.position.set(0,0,0); stage.rotation.set(0,savedRot,0); camera.position.copy(savePos); controls.target.copy(saveTgt); controls.update(); orbitBase=null; recording=false; renderer.setPixelRatio(savedPR); renderer.setSize(cw,ch,false); updateCamAspect(cw/ch); renderer.render(scene,camera); if(btn){ btn.disabled=false; const gl=$('gifLbl'); if(gl) gl.textContent='GIF'; } }
+  finally{ matOpaque.forEach(m=>{ m.transparent=true; m.depthWrite=true; m.needsUpdate=true; }); if(Lsave){ key.position.copy(Lsave.k); fill.position.copy(Lsave.f); back.position.copy(Lsave.b); } controls.enableDamping=_damp; stage.position.set(0,0,0); stage.rotation.set(0,savedRot,0); camera.position.copy(savePos); controls.target.copy(saveTgt); controls.update(); orbitBase=null; recording=false; capturing=false; renderer.setPixelRatio(savedPR); renderer.setSize(cw,ch,false); updateCamAspect(cw/ch); renderer.render(scene,camera); if(btn){ btn.disabled=false; const gl=$('gifLbl'); if(gl) gl.textContent='GIF'; } }
 }
 
 // ===== picker de modelos (Repositorio + Mi pack) =====
