@@ -51,6 +51,28 @@
   .ph-wmark:hover{outline-color:rgba(255,255,255,.75)}
   .ph-wmark.dragging{cursor:grabbing;outline:1.5px dashed var(--accent,#e4453d)}
   .ph-wmark img{display:block;width:100%;height:100%;pointer-events:none}
+  input[type=file]{display:none}   /* los uploads van por <label class="btn">, nunca el control nativo crudo */
+  .wm-preview{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:8px;background:#0c0e12}
+  .wm-loaded{display:flex;align-items:center;gap:8px;margin-top:7px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  .wm-loaded img{width:34px;height:34px;object-fit:contain;background:#0c0e12;border:1px solid var(--line);border-radius:5px;flex:0 0 auto}
+  .wm-name{flex:1;min-width:0;font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* texto de la marca de agua (título/subtítulo) arrastrable libremente */
+  .ph-wtext{position:absolute;cursor:grab;touch-action:none;user-select:none;z-index:5;color:#fff;line-height:1.12;
+    text-shadow:0 1px 3px rgba(0,0,0,.85);outline:1.5px dashed rgba(255,255,255,.35);outline-offset:3px;border-radius:2px;white-space:nowrap;font-family:sans-serif}
+  .ph-wtext:hover{outline-color:rgba(255,255,255,.75)}
+  .ph-wtext.dragging{cursor:grabbing;outline:1.5px dashed var(--accent,#e4453d)}
+  .ph-wtext .wt-title{font-weight:700}
+  .ph-wtext .wt-sub{opacity:.9}
+  /* panel de iluminación expandido */
+  .lrow{display:flex;align-items:center;gap:8px;margin:5px 0}
+  .lrow input[type=range]{flex:1;min-width:0}
+  .lrow input[type=color]{flex:0 0 auto}
+  .lrow .sv{flex:0 0 auto;min-width:36px;text-align:right}
+  input[type=range].kelvin{background:linear-gradient(90deg,#ff9b3d,#ffd9a8,#ffffff,#cfe0ff,#9bc2ff);border-radius:6px;height:6px;appearance:none}
+  input[type=range].kelvin::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--accent);cursor:pointer}
+  /* presets de luz: rejilla 2 columnas (8 botones legibles, no apretujados en 1 fila) */
+  #lightPresets{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+  #lightPresets .btn{flex:none;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #c{width:100%;height:100%;display:block}
   .ph-h{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:700;margin:2px 0 2px}
   .pl{display:block;font-size:11px;color:var(--dim);margin:8px 0 3px}
@@ -154,6 +176,7 @@
   <div class="ph-center">
     <canvas id="c"></canvas>
     <div id="wmark" class="ph-wmark" hidden onpointerdown="wmDown(event)" onpointermove="wmMove(event)" onpointerup="wmUp(event)" onpointercancel="wmUp(event)" title="Arrastra para colocar la marca de agua"><img id="wmarkImg" alt=""></div>
+    <div id="wtext" class="ph-wtext" hidden onpointerdown="wtDown(event)" onpointermove="wtMove(event)" onpointerup="wtUp(event)" onpointercancel="wtUp(event)" title="Arrastra para colocar el texto"><div class="wt-title" id="wtTitle"></div><div class="wt-sub" id="wtSub"></div></div>
     <div class="ph-empty" id="emptyState"><div class="big">📷</div><h2>Estudio de fotos</h2><p>Añade un Pokémon para empezar a montar tu escena, iluminarla y exportarla.</p><button class="btn primary" onclick="openPicker()">➕ Añadir Pokémon</button></div>
     <div class="ph-vptools">
       <button class="btn small" onclick="frameAll()" title="Encuadrar la cámara">🎯 Encuadrar</button>
@@ -212,16 +235,44 @@
             <button class="btn small on" data-lp="studio" onclick="applyLightPreset('studio')">Estudio</button>
             <button class="btn small" data-lp="retrato" onclick="applyLightPreset('retrato')">Retrato</button>
             <button class="btn small" data-lp="cine" onclick="applyLightPreset('cine')">Cine</button>
+            <button class="btn small" data-lp="dramatico" onclick="applyLightPreset('dramatico')">Dramático</button>
+            <button class="btn small" data-lp="suave" onclick="applyLightPreset('suave')">Suave</button>
+            <button class="btn small" data-lp="atardecer" onclick="applyLightPreset('atardecer')">Atardecer</button>
             <button class="btn small" data-lp="plano" onclick="applyLightPreset('plano')">Plano</button>
-            <button class="btn small" data-lp="envolvente" onclick="applyLightPreset('envolvente')" title="Luz pareja desde todos los ejes (sin lados oscuros ni sombra dura)">Envolvente</button>
+            <button class="btn small" data-lp="envolvente" onclick="applyLightPreset('envolvente')" title="Luz pareja desde los 6 ejes (sin lados oscuros ni sombra dura)">Envolvente</button>
           </div>
+          <button class="btn small" style="width:100%;justify-content:center;margin-top:7px" onclick="resetLight()" title="Volver toda la iluminación a los valores por defecto">↺ Restablecer iluminación</button>
         </div>
         <div class="grp">
-          <div class="sec-h">Ajustes</div>
-          <label class="pl">Intensidad</label><div class="sline"><input type="range" min="0.3" max="2" step="0.05" value="1" oninput="setLightMul(this.value); $('liV').textContent=(+this.value).toFixed(2)+'×'"><span class="sv" id="liV">1.00×</span></div>
-          <label class="pl">Tono de luz</label>
-          <div class="seg" id="tempSeg"><button class="btn small on" data-val="neutra" onclick="pickTemp('neutra')">Neutra</button><button class="btn small" data-val="calida" onclick="pickTemp('calida')">Cálida</button><button class="btn small" data-val="fria" onclick="pickTemp('fria')">Fría</button></div>
-          <label class="row2" style="font-size:12px;color:var(--dim);margin-top:8px"><input type="checkbox" id="shBox" checked onchange="toggleShadows(this.checked)"> Sombras</label>
+          <div class="sec-h">Global</div>
+          <label class="pl">Intensidad general</label><div class="sline"><input type="range" id="liMul" min="0.1" max="3" step="0.05" value="1" oninput="setLightMul(this.value)"><span class="sv" id="liV">1.00×</span></div>
+          <label class="pl">Temperatura (cálida ↔ fría)</label><div class="sline"><input type="range" id="kelvin" class="kelvin" min="2000" max="10000" step="100" value="6500" oninput="setKelvin(this.value)"><span class="sv" id="kelvinV">6500K</span></div>
+        </div>
+        <div class="grp" id="grpKey">
+          <div class="sec-h">💡 Luz principal</div>
+          <label class="pl">Color e intensidad</label>
+          <div class="lrow"><input type="color" id="keyCol" value="#ffffff" oninput="setLight('key','col',this.value)" title="Color de la luz"><input type="range" id="keyI" min="0" max="3" step="0.05" value="1.25" oninput="setLight('key','i',this.value)"><span class="sv" id="keyIV">1.25</span></div>
+          <label class="pl">Dirección · giro</label><div class="sline"><input type="range" id="keyAz" min="0" max="360" step="1" value="50" oninput="setLight('key','az',this.value)"><span class="sv" id="keyAzV">50°</span></div>
+          <label class="pl">Dirección · altura</label><div class="sline"><input type="range" id="keyEl" min="-20" max="90" step="1" value="55" oninput="setLight('key','el',this.value)"><span class="sv" id="keyElV">55°</span></div>
+          <label class="row2" style="font-size:12px;color:var(--dim);margin-top:6px"><input type="checkbox" id="keyFollow" onchange="setLight('key','follow',this.checked)"> Seguir a la cámara</label>
+        </div>
+        <div class="grp" id="grpFill">
+          <div class="sec-h">🔆 Relleno</div>
+          <div class="lrow"><input type="color" id="fillCol" value="#ffffff" oninput="setLight('fill','col',this.value)" title="Color"><input type="range" id="fillI" min="0" max="2" step="0.05" value="0.45" oninput="setLight('fill','i',this.value)"><span class="sv" id="fillIV">0.45</span></div>
+        </div>
+        <div class="grp" id="grpBack">
+          <div class="sec-h">🌙 Contraluz</div>
+          <div class="lrow"><input type="color" id="backCol" value="#ffe6b0" oninput="setLight('back','col',this.value)" title="Color"><input type="range" id="backI" min="0" max="2.5" step="0.05" value="0.6" oninput="setLight('back','i',this.value)"><span class="sv" id="backIV">0.60</span></div>
+        </div>
+        <div class="grp">
+          <div class="sec-h">🌫️ Ambiente</div>
+          <div class="lrow"><input type="color" id="ambCol" value="#ffffff" oninput="setLight('amb','col',this.value)" title="Color"><input type="range" id="ambI" min="0" max="1.2" step="0.02" value="0.22" oninput="setLight('amb','i',this.value)"><span class="sv" id="ambIV">0.22</span></div>
+        </div>
+        <div class="grp">
+          <div class="sec-h">Sombras</div>
+          <label class="row2" style="font-size:12px;color:var(--dim)"><input type="checkbox" id="shBox" checked onchange="toggleShadows(this.checked)"> Activar sombras</label>
+          <label class="pl">Suavidad</label><div class="sline"><input type="range" id="shSoft" min="0" max="12" step="0.5" value="3" oninput="setShadowSoft(this.value)"><span class="sv" id="shSoftV">3</span></div>
+          <label class="pl">Opacidad</label><div class="sline"><input type="range" id="shOp" min="0" max="0.8" step="0.02" value="0.3" oninput="setShadowOp(this.value)"><span class="sv" id="shOpV">0.30</span></div>
         </div>
         <div class="acc collapsed" data-k="luz_adv"><div class="acc-h" onclick="toggleAcc(this)">Avanzado<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 8l3-3.5"/></svg></div>
           <div class="acc-b">
@@ -270,13 +321,20 @@
       <!-- ===== MARCA ===== -->
       <section data-tab="marca" hidden>
         <div class="grp">
+          <div class="sec-h">Vista previa</div>
+          <canvas id="wmPreview" class="wm-preview" width="400" height="225"></canvas>
+          <div class="muted" style="font-size:11px;margin-top:5px">Así quedará la <b>foto exportada</b> (texto y logo incrustados).</div>
+        </div>
+        <div class="grp">
           <div class="sec-h">Textos</div>
-          <label class="pl">Título</label><input type="text" id="capTitle" placeholder="Nombre del diseño…" style="width:100%">
-          <label class="pl">Subtítulo</label><input type="text" id="capSub" placeholder="autor · detalle…" style="width:100%">
+          <label class="pl">Título</label><input type="text" id="capTitle" placeholder="Nombre del diseño…" style="width:100%" oninput="updateWtext()">
+          <label class="pl">Subtítulo</label><input type="text" id="capSub" placeholder="autor · detalle…" style="width:100%" oninput="updateWtext()">
+          <div class="muted" style="font-size:11px;margin-top:6px">🖱️ <b>Arrastra el texto sobre la vista</b> para colocarlo.</div>
         </div>
         <div class="grp">
           <div class="sec-h">Logo</div>
-          <label class="btn small" style="width:100%;justify-content:center"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.4 2.5H13a.9.9 0 0 1 .9.9v4.6a1 1 0 0 1-.3.7l-5.1 5.1a1 1 0 0 1-1.4 0L2.7 9.3a1 1 0 0 1 0-1.4l5.1-5.1a1 1 0 0 1 .6-.3z"/><circle cx="11" cy="5" r=".9"/></svg>Logo / marca de agua<input type="file" accept=".png" onchange="onLogo(this.files[0])"></label>
+          <label class="btn small" id="logoUpBtn" style="width:100%;justify-content:center"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.4 2.5H13a.9.9 0 0 1 .9.9v4.6a1 1 0 0 1-.3.7l-5.1 5.1a1 1 0 0 1-1.4 0L2.7 9.3a1 1 0 0 1 0-1.4l5.1-5.1a1 1 0 0 1 .6-.3z"/><circle cx="11" cy="5" r=".9"/></svg><span id="logoUpLbl">Subir logo (PNG)</span><input type="file" accept=".png" onchange="onLogo(this.files[0])"></label>
+          <div id="logoLoaded" class="wm-loaded" hidden><img id="logoThumb" alt=""><span class="wm-name" id="logoName"></span><button class="btn small danger" onclick="removeLogo()" title="Quitar el logo">Quitar</button></div>
           <label class="pl">Posición rápida</label>
           <div class="seg" id="logoPresets" style="display:flex;gap:4px;flex-wrap:wrap">
             <button class="btn small" onclick="logoPreset('tl')" title="Arriba izquierda">↖</button>
@@ -439,33 +497,69 @@ function ensureCyc(){ if(cyc) return; cyc=new THREE.Group(); const fl=new THREE.
 function toggleCyc(on){ cycOn=on; ensureCyc(); cyc.visible=on; $('cycBtn')&&$('cycBtn').classList.toggle('on',on); shadowCatcher.visible=shadowsOn&&!on; const cb=$('cycColorBox'); if(cb) cb.style.display=on?'':'none';
   if(on){ if(typeof switchTab==='function') switchTab('fondo'); const ac=document.querySelector('.acc[data-k="fondo_adv"]'); if(ac){ ac.classList.remove('collapsed'); try{ const st=JSON.parse(localStorage.getItem('cs_photo_acc')||'{}'); st['fondo_adv']=false; localStorage.setItem('cs_photo_acc',JSON.stringify(st)); }catch(e){} } } }   // el color del ciclorama vive en el acordeón Personalizar → abrirlo para que sea alcanzable
 function setCycColor(c){ cycColor=c; if(cyc){ cyc.userData.fl.material.color.set(c); cyc.userData.wl.material.color.set(c); } }
-function toggleShadows(on){ shadowsOn=on; if(lightState.preset==='envolvente') return;   // en Envolvente no hay sombra dura; se guarda el estado para al salir
+function toggleShadows(on){ shadowsOn=on; if(L.env) return;   // en Envolvente no hay sombra dura; se guarda el estado para al salir
   key.castShadow=on; shadowCatcher.visible=on&&!cycOn; renderer.shadowMap.needsUpdate=true; }
-// iluminación de 3 puntos + presets + temperatura
-const TEMPS={ neutra:'#ffffff', calida:'#ffd2a1', fria:'#cfe2ff' };
+// ===== ILUMINACIÓN (modelo por-luz: intensidad+color+dirección de cada luz, temperatura Kelvin, sombras) =====
+const _lv1=new THREE.Vector3(),_lv2=new THREE.Vector3(),_lv3=new THREE.Vector3();
+const L={ mul:1, kelvin:6500,
+  amb:{i:0.22,col:'#ffffff'},
+  key:{i:1.25,col:'#ffffff',az:50,el:55,follow:false},
+  fill:{i:0.45,col:'#ffffff',az:-120,el:18},
+  back:{i:0.6,col:'#ffe6b0',az:180,el:50},
+  env:false };
+let lightPreset='studio';
+// presets: cargan TODOS los valores en los controles (col=color, i=intensidad, az/el=dirección en grados)
 const LIGHT_PRESETS={
-  studio:{amb:0.22,key:[40,80,50,1.25],fill:[-60,20,-30,0.45],back:[0,60,-80,0.6]},
-  retrato:{amb:0.30,key:[25,55,70,1.05],fill:[-40,25,40,0.5],back:[0,70,-60,0.35]},
-  cine:{amb:0.10,key:[75,50,30,1.55],fill:[-50,20,-20,0.12],back:[-10,60,-80,0.95]},
-  plano:{amb:0.5,key:[20,60,60,0.75],fill:[-20,40,-40,0.7],back:[0,0,0,0]},
+  studio:    {kelvin:6500, amb:{i:0.22,col:'#ffffff'}, key:{i:1.25,col:'#ffffff',az:50,el:55,follow:false}, fill:{i:0.45,col:'#ffffff',az:-120,el:18}, back:{i:0.6,col:'#ffe6b0',az:180,el:50}, env:false},
+  retrato:   {kelvin:5400, amb:{i:0.30,col:'#ffffff'}, key:{i:1.05,col:'#fff2e2',az:32,el:42,follow:false}, fill:{i:0.5,col:'#eef3ff',az:130,el:22}, back:{i:0.35,col:'#ffffff',az:200,el:58}, env:false},
+  cine:      {kelvin:4300, amb:{i:0.10,col:'#10131c'}, key:{i:1.55,col:'#fff0d6',az:70,el:34,follow:false}, fill:{i:0.12,col:'#6f86c4',az:-110,el:14}, back:{i:0.95,col:'#ffdf9e',az:190,el:50}, env:false},
+  dramatico: {kelvin:6200, amb:{i:0.04,col:'#090b11'}, key:{i:2.1,col:'#ffffff',az:82,el:24,follow:false}, fill:{i:0.04,col:'#445066',az:-100,el:10}, back:{i:0.55,col:'#8fb0ff',az:205,el:62}, env:false},
+  suave:     {kelvin:5600, amb:{i:0.46,col:'#fff6ec'}, key:{i:0.9,col:'#fff3e6',az:40,el:62,follow:false}, fill:{i:0.62,col:'#ffffff',az:-120,el:42}, back:{i:0.3,col:'#ffffff',az:180,el:55}, env:false},
+  atardecer: {kelvin:3200, amb:{i:0.22,col:'#3a2a3a'}, key:{i:1.5,col:'#ff9a4d',az:95,el:14,follow:false}, fill:{i:0.3,col:'#6a78c8',az:-80,el:30}, back:{i:0.7,col:'#ffd089',az:210,el:40}, env:false},
+  plano:     {kelvin:6500, amb:{i:0.5,col:'#ffffff'},  key:{i:0.75,col:'#ffffff',az:30,el:55,follow:false}, fill:{i:0.7,col:'#ffffff',az:-150,el:35}, back:{i:0,col:'#ffffff',az:180,el:50}, env:false},
+  envolvente:{kelvin:6500, amb:{i:0.16,col:'#ffffff'}, env:true},
 };
-const lightState={preset:'studio',mul:1,temp:'neutra'};
-function applyLights(){ const m=lightState.mul, c=TEMPS[lightState.temp]||'#ffffff';
-  if(lightState.preset==='envolvente'){   // luz desde los 6 ejes, plana y sin lados oscuros
-    omni.visible=true; omniLights.forEach(l=>{ l.intensity=0.5*m; l.color.set(c); });
-    amb.intensity=0.16*m; key.intensity=0; fill.intensity=0; back.intensity=0;
-    key.castShadow=false; shadowCatcher.visible=false;   // sin luz clave → sin sombra dura
-    return; }
+function kelvinRGB(k){ k=k/100; let r,g,b;
+  if(k<=66){ r=255; g=99.4708*Math.log(k)-161.1196; } else { r=329.6987*Math.pow(k-60,-0.1332); g=288.1222*Math.pow(k-60,-0.0755); }
+  if(k>=66) b=255; else if(k<=19) b=0; else b=138.5177*Math.log(k-10)-305.0448;
+  const cl=v=>Math.max(0,Math.min(255,v))/255; return [cl(r),cl(g),cl(b)]; }
+function tintCol(hex){ const c=new THREE.Color(hex), k=kelvinRGB(L.kelvin); c.r*=k[0]; c.g*=k[1]; c.b*=k[2]; return c; }
+function dirVec(az,el,d){ az=az*Math.PI/180; el=el*Math.PI/180; const ce=Math.cos(el); return [Math.sin(az)*ce*d, Math.sin(el)*d, Math.cos(az)*ce*d]; }
+function applyLights(){
+  amb.color.copy(tintCol(L.amb.col)); amb.intensity=L.amb.i*L.mul;
+  if(L.env){ omni.visible=true; const c=tintCol('#ffffff'); omniLights.forEach(l=>{ l.intensity=0.5*L.mul; l.color.copy(c); });
+    key.intensity=0; fill.intensity=0; back.intensity=0; key.castShadow=false; shadowCatcher.visible=false; return; }
   omni.visible=false; omniLights.forEach(l=>l.intensity=0);
-  key.castShadow=shadowsOn; shadowCatcher.visible=shadowsOn&&!cycOn;   // restaurar sombras del modo 3 puntos
-  const p=LIGHT_PRESETS[lightState.preset]||LIGHT_PRESETS.studio;
-  amb.intensity=p.amb*m; key.position.set(p.key[0],p.key[1],p.key[2]); key.intensity=p.key[3]*m;
-  fill.position.set(p.fill[0],p.fill[1],p.fill[2]); fill.intensity=p.fill[3]*m;
-  back.position.set(p.back[0],p.back[1],p.back[2]); back.intensity=p.back[3]*m;
-  key.color.set(c); fill.color.set(c); }
-function applyLightPreset(name){ lightState.preset=name; document.querySelectorAll('#lightPresets .btn').forEach(b=>b.classList.toggle('on',b.dataset.lp===name)); applyLights(); }
-function setLightMul(v){ lightState.mul=+v; applyLights(); }
-function setTemp(v){ lightState.temp=v; applyLights(); }
+  if(!L.key.follow){ const k=dirVec(L.key.az,L.key.el,120); key.position.set(k[0],k[1],k[2]); }
+  key.intensity=L.key.i*L.mul; key.color.copy(tintCol(L.key.col));
+  const f=dirVec(L.fill.az,L.fill.el,120); fill.position.set(f[0],f[1],f[2]); fill.intensity=L.fill.i*L.mul; fill.color.copy(tintCol(L.fill.col));
+  const b=dirVec(L.back.az,L.back.el,120); back.position.set(b[0],b[1],b[2]); back.intensity=L.back.i*L.mul; back.color.copy(tintCol(L.back.col));
+  key.castShadow=shadowsOn; shadowCatcher.visible=shadowsOn&&!cycOn; renderer.shadowMap.needsUpdate=true; }
+function setLight(part,prop,val){ if(prop==='col') L[part].col=val; else if(prop==='follow') L[part].follow=!!val; else { L[part][prop]=+val;
+    const id={i:part+'IV',az:part+'AzV',el:part+'ElV'}[prop]; const e=id&&$(id); if(e) e.textContent=(prop==='i')?(+val).toFixed(2):(Math.round(val)+'°'); }
+  applyLights(); }
+function setLightMul(v){ L.mul=+v; const e=$('liV'); if(e) e.textContent=(+v).toFixed(2)+'×'; applyLights(); }
+function setKelvin(v){ L.kelvin=+v; const e=$('kelvinV'); if(e) e.textContent=Math.round(v)+'K'; applyLights(); }
+function setShadowSoft(v){ key.shadow.radius=+v; const e=$('shSoftV'); if(e) e.textContent=(+v); renderer.shadowMap.needsUpdate=true; }
+function setShadowOp(v){ shadowCatcher.material.opacity=+v; const e=$('shOpV'); if(e) e.textContent=(+v).toFixed(2); }
+function syncLightUI(){ const sv=(id,v)=>{ const e=$(id); if(e) e.value=v; }, tx=(id,v)=>{ const e=$(id); if(e) e.textContent=v; };
+  sv('liMul',L.mul); tx('liV',L.mul.toFixed(2)+'×'); sv('kelvin',L.kelvin); tx('kelvinV',Math.round(L.kelvin)+'K');
+  sv('keyCol',L.key.col); sv('keyI',L.key.i); tx('keyIV',L.key.i.toFixed(2)); sv('keyAz',L.key.az); tx('keyAzV',Math.round(L.key.az)+'°'); sv('keyEl',L.key.el); tx('keyElV',Math.round(L.key.el)+'°'); const kf=$('keyFollow'); if(kf) kf.checked=!!L.key.follow;
+  sv('fillCol',L.fill.col); sv('fillI',L.fill.i); tx('fillIV',L.fill.i.toFixed(2));
+  sv('backCol',L.back.col); sv('backI',L.back.i); tx('backIV',L.back.i.toFixed(2));
+  sv('ambCol',L.amb.col); sv('ambI',L.amb.i); tx('ambIV',L.amb.i.toFixed(2));
+  ['grpKey','grpFill','grpBack'].forEach(id=>{ const e=$(id); if(e) e.style.opacity=L.env?0.4:1; });   // en Envolvente las 3 luces no aplican
+}
+function resetLight(){   // vuelve toda la iluminación a por defecto (preset Estudio + global/sombras/ACES)
+  L.mul=1; shadowsOn=true; const sb=$('shBox'); if(sb) sb.checked=true;
+  const so=$('shSoft'); if(so) so.value=3; setShadowSoft(3); const so2=$('shOp'); if(so2) so2.value=0.3; setShadowOp(0.3);
+  const tb=$('toneBox'); if(tb&&tb.checked){ tb.checked=false; setTone(false); }
+  applyLightPreset('studio'); toast('Iluminación restablecida','ok'); }
+function applyLightPreset(name){ const p=LIGHT_PRESETS[name]; if(!p) return; lightPreset=name;
+  L.env=!!p.env; if(p.kelvin!=null) L.kelvin=p.kelvin;
+  ['amb','key','fill','back'].forEach(k=>{ if(p[k]) Object.assign(L[k],p[k]); });
+  document.querySelectorAll('#lightPresets .btn').forEach(b=>b.classList.toggle('on',b.dataset.lp===name));
+  syncLightUI(); applyLights(); }
 
 function updateCamAspect(aspect){ if(camera.isPerspectiveCamera){ camera.aspect=aspect; } else { camera.left=-orthoSize*aspect; camera.right=orthoSize*aspect; camera.top=orthoSize; camera.bottom=-orthoSize; } camera.updateProjectionMatrix(); }
 function resize3(){ if(recording) return; const w=canvas.clientWidth,h=canvas.clientHeight; if(w&&h&&(canvas.width!==w||canvas.height!==h)){ renderer.setSize(w,h,false); updateCamAspect(w/h); } }
@@ -515,7 +609,11 @@ function loop(){ requestAnimationFrame(loop); if(capturing) return; resize3(); c
   if(recording&&turntable&&recDur>0) applyTurnFrame((now-recStart)/recDur);
   tc.visible = !recording && !busyExport && sel>=0 && !!tc.object && !userGizmoHidden;   // el gizmo NUNCA sale en foto/vídeo, ni sin selección
   if(!camRec && !flying) controls.update();   // en modo cámara (órbita grabada) o volando, la cámara la fijamos nosotros
-  renderer.render(scene,camera); }
+  if(L.key.follow && !L.env){ const cp=camera.position, ct=controls.target; const fwd=_lv1.subVectors(cp,ct); if(fwd.lengthSq()<1e-6) fwd.set(0,0,1); fwd.normalize();
+    const rt=_lv2.crossVectors(camera.up,fwd).normalize(), up=_lv3.crossVectors(fwd,rt).normalize(), d=cp.distanceTo(ct)||80;
+    key.position.copy(ct).addScaledVector(fwd,d).addScaledVector(rt,-d*0.45).addScaledVector(up,d*0.5); }   // luz clave 3/4 anclada a la cámara
+  renderer.render(scene,camera);
+  if((++_wmTick & 7)===0) drawWmPreview(); }   // mini-preview del resultado final (throttle ~7/s; sale solo en la pestaña Marca)
 
 function frameAll(){ if(!actors.length) return; stage.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(stage); if(b.isEmpty()) return; const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()); const r=Math.max(s.x,s.y,s.z)||16; camera.position.set(c.x+r*0.7, c.y+s.y*0.15+r*0.5, c.z+r*1.8); controls.target.copy(c); controls.update(); if(camera.isOrthographicCamera){ camera.zoom=1; orthoSize=r*0.95; updateCamAspect((canvas.clientWidth||1)/(canvas.clientHeight||1)); } tcResize(); }
 
@@ -701,13 +799,46 @@ async function bgLibApply(id){ const list=await bgLibList(); const r=list.find(x
 // ===== presentación: aspecto WYSIWYG, marca/texto, color cine =====
 let aspectRatio=null;
 function setAspect(v){ aspectRatio=v?parseFloat(v):null; layoutCanvas(); }
-function layoutCanvas(){ const host=document.querySelector('.ph-center'); if(!host) return; const W=host.clientWidth,H=host.clientHeight; if(!aspectRatio){ canvas.style.width='100%'; canvas.style.height='100%'; } else { let w=W,h=W/aspectRatio; if(h>H){ h=H; w=H*aspectRatio; } canvas.style.width=Math.round(w)+'px'; canvas.style.height=Math.round(h)+'px'; } if(typeof outSizeReadout==='function') outSizeReadout(); if(typeof updateWmark==='function') updateWmark(); }
+function layoutCanvas(){ const host=document.querySelector('.ph-center'); if(!host) return; const W=host.clientWidth,H=host.clientHeight; if(!aspectRatio){ canvas.style.width='100%'; canvas.style.height='100%'; } else { let w=W,h=W/aspectRatio; if(h>H){ h=H; w=H*aspectRatio; } canvas.style.width=Math.round(w)+'px'; canvas.style.height=Math.round(h)+'px'; } if(typeof outSizeReadout==='function') outSizeReadout(); if(typeof updateWmark==='function') updateWmark(); if(typeof updateWtext==='function') updateWtext(); }
 window.addEventListener('resize',layoutCanvas);
-let logoImg=null, logoPos=null, _wmDrag=null;   // logoPos = {x,y} normalizado [0..1] de la esquina sup-izq del logo dentro del lienzo
+let logoImg=null, logoPos=null, _wmDrag=null, _wmTick=0;   // logoPos = {x,y} normalizado [0..1] de la esquina sup-izq del logo dentro del lienzo
+let textPos=null, _wtDrag=null;   // textPos = {x,y} normalizado de la esquina sup-izq del bloque de texto
+function updateWtext(){ const wt=$('wtext'); if(!wt) return; const title=($('capTitle')&&$('capTitle').value||'').trim(), sub=($('capSub')&&$('capSub').value||'').trim();
+  if(!(title||sub)){ wt.hidden=true; if(typeof drawWmPreview==='function') drawWmPreview(); return; }
+  if(!textPos) textPos={x:0.04,y:0.86};
+  const host=document.querySelector('.ph-center'); if(!host) return; const hr=host.getBoundingClientRect(), cr=canvas.getBoundingClientRect();
+  const offX=cr.left-hr.left, offY=cr.top-hr.top, tS=Math.max(11,cr.height*0.05), sS=Math.max(9,cr.height*0.032);
+  const tEl=$('wtTitle'), sEl=$('wtSub');
+  tEl.textContent=title; tEl.style.display=title?'block':'none'; tEl.style.fontSize=tS+'px';
+  sEl.textContent=sub; sEl.style.display=sub?'block':'none'; sEl.style.fontSize=sS+'px'; sEl.style.marginTop=(title&&sub?Math.round(cr.height*0.012):0)+'px';
+  wt.hidden=false; wt.style.left=Math.round(offX+textPos.x*cr.width)+'px'; wt.style.top=Math.round(offY+textPos.y*cr.height)+'px'; }
+function wtDown(e){ const t=($('capTitle')&&$('capTitle').value||'').trim(), s=($('capSub')&&$('capSub').value||'').trim(); if(!(t||s)) return; if(!textPos) textPos={x:0.04,y:0.86}; const wt=$('wtext'); _wtDrag={px:e.clientX,py:e.clientY,x0:textPos.x,y0:textPos.y}; wt.classList.add('dragging'); try{ wt.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); e.stopPropagation(); }
+function wtMove(e){ if(!_wtDrag) return; const cr=canvas.getBoundingClientRect(), wt=$('wtext'), wr=wt.getBoundingClientRect();
+  let nx=_wtDrag.x0+(e.clientX-_wtDrag.px)/cr.width, ny=_wtDrag.y0+(e.clientY-_wtDrag.py)/cr.height;
+  const maxX=Math.max(0,1-wr.width/cr.width), maxY=Math.max(0,1-wr.height/cr.height);
+  textPos={x:Math.max(0,Math.min(maxX,nx)), y:Math.max(0,Math.min(maxY,ny))}; updateWtext(); e.preventDefault(); }
+function wtUp(e){ if(!_wtDrag) return; _wtDrag=null; const wt=$('wtext'); if(wt) wt.classList.remove('dragging'); }
 function logoAspect(){ return logoImg?(logoImg.height/logoImg.width||1):1; }
 function logoScl(){ return (+($('logoSize')&&$('logoSize').value)||18)/100; }
 function logoOpac(){ return (+($('logoOp')&&$('logoOp').value)||90)/100; }
-function onLogo(f){ if(!f) return; const url=URL.createObjectURL(f); const im=new Image(); im.onload=()=>{ URL.revokeObjectURL(url); logoImg=im; const wi=$('wmarkImg'); if(wi) wi.src=im.src; if(!logoPos) logoPreset('br'); else updateWmark(); toast('Logo cargado · arrástralo para colocarlo','ok'); }; im.onerror=()=>{ URL.revokeObjectURL(url); toast('No se pudo leer el logo','err'); }; im.src=url; }
+function onLogo(f){ if(!f) return; const rd=new FileReader();
+  rd.onload=()=>{ const im=new Image(); im.onload=()=>{ logoImg=im;
+      const wi=$('wmarkImg'); if(wi) wi.src=im.src; const th=$('logoThumb'); if(th) th.src=im.src;
+      const nm=$('logoName'); if(nm) nm.textContent=f.name||'logo.png'; const ld=$('logoLoaded'); if(ld) ld.hidden=false;
+      const lbl=$('logoUpLbl'); if(lbl) lbl.textContent='Cambiar logo';
+      if(!logoPos) logoPreset('br'); else updateWmark(); drawWmPreview();
+      toast('Logo cargado · arrástralo sobre la vista','ok'); };
+    im.onerror=()=>toast('No se pudo leer el logo','err'); im.src=rd.result; };
+  rd.onerror=()=>toast('No se pudo leer el logo','err'); rd.readAsDataURL(f); }
+function removeLogo(){ logoImg=null; logoPos=null; const ld=$('logoLoaded'); if(ld) ld.hidden=true;
+  const lbl=$('logoUpLbl'); if(lbl) lbl.textContent='Subir logo (PNG)'; const up=$('logoUpBtn'); const inp=up&&up.querySelector('input'); if(inp) inp.value='';
+  updateWmark(); drawWmPreview(); }
+function drawWmPreview(){ const pc=$('wmPreview'); if(!pc) return; const sec=document.querySelector('section[data-tab="marca"]'); if(sec&&sec.hidden) return;
+  const cr=canvas.getBoundingClientRect(); const ar=(cr.width&&cr.height)?(cr.width/cr.height):(16/9);
+  const PW=400, PH=Math.max(90,Math.round(PW/ar)); if(pc.width!==PW||pc.height!==PH){ pc.width=PW; pc.height=PH; }
+  const g=pc.getContext('2d'); g.clearRect(0,0,PW,PH); g.fillStyle='#0c0e12'; g.fillRect(0,0,PW,PH);
+  try{ g.drawImage(canvas,0,0,PW,PH); }catch(e){}
+  const ov=(typeof buildOverlay==='function')?buildOverlay(PW,PH):null; if(ov) g.drawImage(ov,0,0); }
 function logoPreset(p){ const scl=logoScl(), lh=scl*logoAspect(), m=0.03;
   const P={ tl:[m,m], tr:[1-scl-m,m], cc:[0.5-scl/2,0.5-lh/2], bl:[m,1-lh-m], br:[1-scl-m,1-lh-m] };
   const v=P[p]||P.br; logoPos={x:v[0],y:v[1]}; updateWmark(); }
@@ -723,11 +854,13 @@ function wmMove(e){ if(!_wmDrag) return; const cr=canvas.getBoundingClientRect()
 function wmUp(e){ if(!_wmDrag) return; _wmDrag=null; const wm=$('wmark'); if(wm) wm.classList.remove('dragging'); }
 function buildOverlay(w,h){ const title=($('capTitle')&&$('capTitle').value||'').trim(), sub=($('capSub')&&$('capSub').value||'').trim(); const hasCap=!!(title||sub), hasLogo=!!logoImg; if(!hasCap&&!hasLogo) return null;
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d');
-  if(hasCap){ const pad=Math.round(h*0.035), tS=Math.max(15,Math.round(h*0.05)), sS=Math.max(11,Math.round(h*0.032)); const stripH=(title?tS+10:0)+(sub?sS+6:0)+pad*2;
-    const gr=g.createLinearGradient(0,h-stripH,0,h); gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,0.65)'); g.fillStyle=gr; g.fillRect(0,h-stripH,w,stripH);
-    g.textAlign='left'; g.textBaseline='alphabetic'; let y=h-pad;
-    if(sub){ g.font=sS+'px sans-serif'; g.fillStyle='rgba(255,255,255,0.85)'; g.fillText(sub,pad,y); y-=sS+8; }
-    if(title){ g.font='bold '+tS+'px sans-serif'; g.fillStyle='#fff'; g.fillText(title,pad,y); }
+  if(hasCap){ const tS=Math.max(15,Math.round(h*0.05)), sS=Math.max(11,Math.round(h*0.032)), gap=Math.round(h*0.012);
+    const tp=textPos||{x:0.04,y:0.86}; const x=Math.round(tp.x*w); let cy=Math.round(tp.y*h);   // posición libre (esquina sup-izq del bloque)
+    g.textAlign='left'; g.textBaseline='top';
+    g.shadowColor='rgba(0,0,0,0.8)'; g.shadowBlur=Math.round(h*0.012); g.shadowOffsetX=0; g.shadowOffsetY=Math.round(h*0.004);   // sombra para que se lea en cualquier fondo (sustituye la franja)
+    if(title){ g.font='bold '+tS+'px sans-serif'; g.fillStyle='#fff'; g.fillText(title,x,cy); cy+=tS+gap; }
+    if(sub){ g.font=sS+'px sans-serif'; g.fillStyle='rgba(255,255,255,0.9)'; g.fillText(sub,x,cy); }
+    g.shadowColor='transparent'; g.shadowBlur=0; g.shadowOffsetY=0;
   }
   if(hasLogo){ const scl=(+($('logoSize')&&$('logoSize').value)||18)/100, op=(+($('logoOp')&&$('logoOp').value)||90)/100;
     const lw=Math.round(w*scl), lh=Math.round(lw*(logoImg.height/logoImg.width||1));
@@ -927,7 +1060,6 @@ function switchTab(k){ document.querySelectorAll('#phTabs .tab').forEach(t=>t.cl
 function restoreTab(){ let k='cam'; try{ k=localStorage.getItem('cs_photo_tab')||'cam'; }catch(e){} if(!document.querySelector('#phTabWrap>section[data-tab="'+k+'"]')) k='cam'; switchTab(k); }
 function switchOut(m){ document.querySelectorAll('#outSeg .btn').forEach(b=>b.classList.toggle('on',b.dataset.out===m)); $('outFoto').hidden=(m!=='foto'); $('outVideo').hidden=(m!=='video'); }
 function pickCamType(v){ setCamType(v); document.querySelectorAll('#camTypeSeg .btn').forEach(b=>b.classList.toggle('on',b.dataset.val===v)); }
-function pickTemp(v){ setTemp(v); document.querySelectorAll('#tempSeg .btn').forEach(b=>b.classList.toggle('on',b.dataset.val===v)); }
 function updateExportBar(){ const dis=actors.length===0; ['footShot','recBtn','gifBtn'].forEach(id=>{ const b=$(id); if(b){ b.disabled=dis; b.title=dis?'Añade un Pokémon primero':''; } }); }
 restoreAcc(); restoreTab(); switchOut('foto');
 applyLights(); applyBg(); layoutCanvas(); renderActorList(); loadModels(); renderBgLib(); setCamType('ortho'); loop();   // cámara ortográfica por defecto
