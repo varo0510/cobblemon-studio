@@ -220,8 +220,11 @@ document.addEventListener('click',e=>{ if(!e.target.closest('.fic-search')){ con
 function setFocus(sp){ focusSp=norm(sp); $('ficSearch').value=cap(focusSp); $('ficPick').classList.remove('open'); render(); }
 
 // ===== puente / arranque =====
-window.csFichaFocus=function(sp){ if(sp) setFocus(sp); };
+let _ficReady=false, _ficPending=null;
+window.csFichaFocus=function(sp){ if(!sp) return; if(_ficReady) setFocus(sp); else _ficPending=sp; };   // si el foco llega durante la carga, se guarda y se aplica al terminar (evita ficha vacía al 1er clic)
 async function reload(){ modelCache.clear(); await scanPack(); render(); }
-(async function init(){ await loadCatalog(); if(PROJECT&&PROJECT.root){ await scanPack(); } let f=null; try{ f=localStorage.getItem('cs_ficha_focus'); if(f) localStorage.removeItem('cs_ficha_focus'); }catch(e){} if(f) setFocus(f); else render(); })();
+(async function init(){ await loadCatalog(); if(PROJECT&&PROJECT.root){ await scanPack(); } _ficReady=true;
+  let f=_ficPending; if(!f){ try{ f=localStorage.getItem('cs_ficha_focus'); }catch(e){} } try{ localStorage.removeItem('cs_ficha_focus'); }catch(e){} _ficPending=null;
+  if(f) setFocus(f); else render(); })();
 </script>
 </body></html>

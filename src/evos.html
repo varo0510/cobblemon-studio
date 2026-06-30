@@ -394,8 +394,11 @@ function playEvolution(){ if(playing) return; if(!toObj){ toast('No tengo el mod
   requestAnimationFrame(step); }
 
 // ===== puente / arranque =====
-window.csEvosFocus=function(sp){ if(sp) setFocus(sp); };
+let _evReady=false, _evPending=null;
+window.csEvosFocus=function(sp){ if(!sp) return; if(_evReady) setFocus(sp); else _evPending=sp; };   // foco durante la carga → pendiente, se aplica al terminar (evita cadena vacía al 1er clic)
 async function reload(){ const ok=await scan(); render(); return ok; }
-(async function init(){ await loadCatalog(); if(PROJECT&&PROJECT.root){ await scan(); } let f=null; try{ f=localStorage.getItem('cs_evos_focus'); if(f) localStorage.removeItem('cs_evos_focus'); }catch(e){} if(f){ setFocus(f); } else render(); })();
+(async function init(){ await loadCatalog(); if(PROJECT&&PROJECT.root){ await scan(); } _evReady=true;
+  let f=_evPending; if(!f){ try{ f=localStorage.getItem('cs_evos_focus'); }catch(e){} } try{ localStorage.removeItem('cs_evos_focus'); }catch(e){} _evPending=null;
+  if(f){ setFocus(f); } else render(); })();
 </script>
 </body></html>

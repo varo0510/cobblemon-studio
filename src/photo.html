@@ -45,6 +45,12 @@
   .ph-left{border-right:1px solid var(--line)}
   .ph-right{border-left:1px solid var(--line)}
   .ph-center{position:relative;min-width:0;background:#0c0e12;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  /* marca de agua arrastrable (preview en vivo de la posición libre del logo) */
+  .ph-wmark{position:absolute;cursor:grab;touch-action:none;user-select:none;z-index:5;
+    outline:1.5px dashed rgba(255,255,255,.35);outline-offset:2px;border-radius:2px;transition:outline-color .12s}
+  .ph-wmark:hover{outline-color:rgba(255,255,255,.75)}
+  .ph-wmark.dragging{cursor:grabbing;outline:1.5px dashed var(--accent,#e4453d)}
+  .ph-wmark img{display:block;width:100%;height:100%;pointer-events:none}
   #c{width:100%;height:100%;display:block}
   .ph-h{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:700;margin:2px 0 2px}
   .pl{display:block;font-size:11px;color:var(--dim);margin:8px 0 3px}
@@ -147,6 +153,7 @@
 
   <div class="ph-center">
     <canvas id="c"></canvas>
+    <div id="wmark" class="ph-wmark" hidden onpointerdown="wmDown(event)" onpointermove="wmMove(event)" onpointerup="wmUp(event)" onpointercancel="wmUp(event)" title="Arrastra para colocar la marca de agua"><img id="wmarkImg" alt=""></div>
     <div class="ph-empty" id="emptyState"><div class="big">📷</div><h2>Estudio de fotos</h2><p>Añade un Pokémon para empezar a montar tu escena, iluminarla y exportarla.</p><button class="btn primary" onclick="openPicker()">➕ Añadir Pokémon</button></div>
     <div class="ph-vptools">
       <button class="btn small" onclick="frameAll()" title="Encuadrar la cámara">🎯 Encuadrar</button>
@@ -270,9 +277,17 @@
         <div class="grp">
           <div class="sec-h">Logo</div>
           <label class="btn small" style="width:100%;justify-content:center"><svg class="ic" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.4 2.5H13a.9.9 0 0 1 .9.9v4.6a1 1 0 0 1-.3.7l-5.1 5.1a1 1 0 0 1-1.4 0L2.7 9.3a1 1 0 0 1 0-1.4l5.1-5.1a1 1 0 0 1 .6-.3z"/><circle cx="11" cy="5" r=".9"/></svg>Logo / marca de agua<input type="file" accept=".png" onchange="onLogo(this.files[0])"></label>
-          <div class="field"><span class="lbl">Esquina</span><select id="logoCorner"><option value="br">Abajo dcha.</option><option value="bl">Abajo izq.</option><option value="tr">Arriba dcha.</option><option value="tl">Arriba izq.</option></select></div>
-          <label class="pl">Tamaño del logo</label><div class="sline"><input type="range" id="logoSize" min="6" max="40" value="18" oninput="$('lsV').textContent=this.value+'%'"><span class="sv" id="lsV">18%</span></div>
-          <label class="pl">Transparencia del logo</label><div class="sline"><input type="range" id="logoOp" min="20" max="100" value="90" oninput="$('loV').textContent=this.value+'%'"><span class="sv" id="loV">90%</span></div>
+          <label class="pl">Posición rápida</label>
+          <div class="seg" id="logoPresets" style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="btn small" onclick="logoPreset('tl')" title="Arriba izquierda">↖</button>
+            <button class="btn small" onclick="logoPreset('tr')" title="Arriba derecha">↗</button>
+            <button class="btn small" onclick="logoPreset('cc')" title="Centro">◎</button>
+            <button class="btn small" onclick="logoPreset('bl')" title="Abajo izquierda">↙</button>
+            <button class="btn small" onclick="logoPreset('br')" title="Abajo derecha">↘</button>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:6px">🖱️ <b>Arrastra el logo sobre la vista</b> para colocarlo donde quieras.</div>
+          <label class="pl">Tamaño del logo</label><div class="sline"><input type="range" id="logoSize" min="6" max="40" value="18" oninput="$('lsV').textContent=this.value+'%';updateWmark()"><span class="sv" id="lsV">18%</span></div>
+          <label class="pl">Transparencia del logo</label><div class="sline"><input type="range" id="logoOp" min="20" max="100" value="90" oninput="$('loV').textContent=this.value+'%';updateWmark()"><span class="sv" id="loV">90%</span></div>
           <div class="muted" style="font-size:11px;margin-top:8px">Se incrusta en la Foto PNG, el GIF y la hoja de contacto (no en el WebM).</div>
         </div>
       </section>
@@ -686,10 +701,26 @@ async function bgLibApply(id){ const list=await bgLibList(); const r=list.find(x
 // ===== presentación: aspecto WYSIWYG, marca/texto, color cine =====
 let aspectRatio=null;
 function setAspect(v){ aspectRatio=v?parseFloat(v):null; layoutCanvas(); }
-function layoutCanvas(){ const host=document.querySelector('.ph-center'); if(!host) return; const W=host.clientWidth,H=host.clientHeight; if(!aspectRatio){ canvas.style.width='100%'; canvas.style.height='100%'; } else { let w=W,h=W/aspectRatio; if(h>H){ h=H; w=H*aspectRatio; } canvas.style.width=Math.round(w)+'px'; canvas.style.height=Math.round(h)+'px'; } if(typeof outSizeReadout==='function') outSizeReadout(); }
+function layoutCanvas(){ const host=document.querySelector('.ph-center'); if(!host) return; const W=host.clientWidth,H=host.clientHeight; if(!aspectRatio){ canvas.style.width='100%'; canvas.style.height='100%'; } else { let w=W,h=W/aspectRatio; if(h>H){ h=H; w=H*aspectRatio; } canvas.style.width=Math.round(w)+'px'; canvas.style.height=Math.round(h)+'px'; } if(typeof outSizeReadout==='function') outSizeReadout(); if(typeof updateWmark==='function') updateWmark(); }
 window.addEventListener('resize',layoutCanvas);
-let logoImg=null;
-function onLogo(f){ if(!f) return; const url=URL.createObjectURL(f); const im=new Image(); im.onload=()=>{ URL.revokeObjectURL(url); logoImg=im; toast('Logo cargado','ok'); }; im.onerror=()=>{ URL.revokeObjectURL(url); toast('No se pudo leer el logo','err'); }; im.src=url; }
+let logoImg=null, logoPos=null, _wmDrag=null;   // logoPos = {x,y} normalizado [0..1] de la esquina sup-izq del logo dentro del lienzo
+function logoAspect(){ return logoImg?(logoImg.height/logoImg.width||1):1; }
+function logoScl(){ return (+($('logoSize')&&$('logoSize').value)||18)/100; }
+function logoOpac(){ return (+($('logoOp')&&$('logoOp').value)||90)/100; }
+function onLogo(f){ if(!f) return; const url=URL.createObjectURL(f); const im=new Image(); im.onload=()=>{ URL.revokeObjectURL(url); logoImg=im; const wi=$('wmarkImg'); if(wi) wi.src=im.src; if(!logoPos) logoPreset('br'); else updateWmark(); toast('Logo cargado · arrástralo para colocarlo','ok'); }; im.onerror=()=>{ URL.revokeObjectURL(url); toast('No se pudo leer el logo','err'); }; im.src=url; }
+function logoPreset(p){ const scl=logoScl(), lh=scl*logoAspect(), m=0.03;
+  const P={ tl:[m,m], tr:[1-scl-m,m], cc:[0.5-scl/2,0.5-lh/2], bl:[m,1-lh-m], br:[1-scl-m,1-lh-m] };
+  const v=P[p]||P.br; logoPos={x:v[0],y:v[1]}; updateWmark(); }
+function updateWmark(){ const wm=$('wmark'); if(!wm) return; if(!logoImg||!logoPos){ wm.hidden=true; return; }
+  const host=document.querySelector('.ph-center'); if(!host) return; const hr=host.getBoundingClientRect(), cr=canvas.getBoundingClientRect();
+  const offX=cr.left-hr.left, offY=cr.top-hr.top, scl=logoScl(), lw=scl*cr.width, lh=lw*logoAspect();
+  wm.hidden=false; wm.style.left=Math.round(offX+logoPos.x*cr.width)+'px'; wm.style.top=Math.round(offY+logoPos.y*cr.height)+'px';
+  wm.style.width=Math.round(lw)+'px'; wm.style.height=Math.round(lh)+'px'; wm.style.opacity=logoOpac(); }
+function wmDown(e){ if(!logoImg||!logoPos) return; const wm=$('wmark'); _wmDrag={px:e.clientX,py:e.clientY,x0:logoPos.x,y0:logoPos.y}; wm.classList.add('dragging'); try{ wm.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); e.stopPropagation(); }
+function wmMove(e){ if(!_wmDrag) return; const cr=canvas.getBoundingClientRect(), scl=logoScl(), lhN=scl*logoAspect();
+  let nx=_wmDrag.x0+(e.clientX-_wmDrag.px)/cr.width, ny=_wmDrag.y0+(e.clientY-_wmDrag.py)/cr.height;
+  logoPos={x:Math.max(0,Math.min(1-scl,nx)), y:Math.max(0,Math.min(1-lhN,ny))}; updateWmark(); e.preventDefault(); }
+function wmUp(e){ if(!_wmDrag) return; _wmDrag=null; const wm=$('wmark'); if(wm) wm.classList.remove('dragging'); }
 function buildOverlay(w,h){ const title=($('capTitle')&&$('capTitle').value||'').trim(), sub=($('capSub')&&$('capSub').value||'').trim(); const hasCap=!!(title||sub), hasLogo=!!logoImg; if(!hasCap&&!hasLogo) return null;
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d');
   if(hasCap){ const pad=Math.round(h*0.035), tS=Math.max(15,Math.round(h*0.05)), sS=Math.max(11,Math.round(h*0.032)); const stripH=(title?tS+10:0)+(sub?sS+6:0)+pad*2;
@@ -698,9 +729,10 @@ function buildOverlay(w,h){ const title=($('capTitle')&&$('capTitle').value||'')
     if(sub){ g.font=sS+'px sans-serif'; g.fillStyle='rgba(255,255,255,0.85)'; g.fillText(sub,pad,y); y-=sS+8; }
     if(title){ g.font='bold '+tS+'px sans-serif'; g.fillStyle='#fff'; g.fillText(title,pad,y); }
   }
-  if(hasLogo){ const corner=($('logoCorner')&&$('logoCorner').value)||'br', scl=(+($('logoSize')&&$('logoSize').value)||18)/100, op=(+($('logoOp')&&$('logoOp').value)||90)/100;
-    const lw=Math.round(w*scl), lh=Math.round(lw*(logoImg.height/logoImg.width||1)), m=Math.round(Math.min(w,h)*0.03);
-    let x=m,y=m; if(corner.indexOf('r')>=0) x=w-lw-m; if(corner.indexOf('b')>=0) y=h-lh-m;
+  if(hasLogo){ const scl=(+($('logoSize')&&$('logoSize').value)||18)/100, op=(+($('logoOp')&&$('logoOp').value)||90)/100;
+    const lw=Math.round(w*scl), lh=Math.round(lw*(logoImg.height/logoImg.width||1));
+    const p=logoPos||{x:1-scl-0.03,y:1-(scl*(logoImg.height/logoImg.width||1))-0.03};   // posición libre normalizada (esquina sup-izq), o abajo-dcha por defecto
+    let x=Math.round(p.x*w), y=Math.round(p.y*h); x=Math.max(0,Math.min(w-lw,x)); y=Math.max(0,Math.min(h-lh,y));
     g.globalAlpha=op; try{ g.drawImage(logoImg,x,y,lw,lh); }catch(e){} g.globalAlpha=1;
   }
   return cv;
